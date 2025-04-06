@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=3
+ReferrerUrl=https://github.com/gboncoffee/egg/releases/tag/v3.3.3
+HostUrl=https://objects.githubusercontent.com/github-production-release-asset-2e65be/719860921/440ce10e-743a-4301-9760-3c79ff97f3e7?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=releaseassetproduction%2F20250405%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250405T220854Z&X-Amz-Expires=300&X-Amz-Signature=5afa58f28e18ce92a26f45e0d2613749fff7190e2b163beb42a34a3fe5702892&X-Amz-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3Degg-linux&response-content-type=application%2Foctet-stream

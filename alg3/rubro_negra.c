@@ -28,7 +28,7 @@ struct tNo* exclui (struct tNo *no, struct tNo *raiz);
 struct tNo *busca(struct tNo *no, int chave);
 void freeTree(struct tNo *no); // Declaração adicionada para limpeza
 void ajustaNo(struct tNo *no,struct tNo *novo);
-
+void imprimeArvore(struct tNo *raiz);
 
 int main(int argc, char* argv[]){
   struct tNo *raiz = NULL;
@@ -50,8 +50,9 @@ int main(int argc, char* argv[]){
           fprintf(stderr, "Operação inválida: %c\n", op);
       }
       printf("\n----\n");
-  }
-
+      imprimeArvore(raiz);
+      printf("\n----\n");
+    }
   // Limpa a árvore
   freeTree(raiz);
 
@@ -74,23 +75,23 @@ void ajustaNoPai(struct tNo *no, struct tNo *novo) {
   }
 }
 
-struct tNo *rotEsquerda(struct tNo *p){
-  struct tNo *q = p->dir;
-  p->dir = q->esq;
-  q->pai = p->pai;
-  p->pai = q;
-  q->esq->pai = p;
-  q->esq = p;
-  return q; // retorna a nova raiz da subarvore
+struct tNo *rotEsquerda(struct tNo *x){
+  struct tNo *y = x->dir;
+  x->dir = y->esq;
+  y->pai = x->pai;
+  x->pai = y;
+  y->esq->pai = x;
+  y->esq = x;
+  return y; // retorna a nova raiz da subarvore
 }
 
-struct tNo* rotDireita(struct tNo *p){
-  struct tNo *q = p->esq;
-  p->esq = q->dir;
-  q->pai = p->pai;
-  p->pai = q;
-  q->dir->pai = p;
-  q->dir = p;
+struct tNo* rotDireita(struct tNo *x){
+  struct tNo *q = x->esq;
+  x->esq = q->dir;
+  q->pai = x->pai;
+  x->pai = q;
+  q->dir->pai = x;
+  q->dir = x;
   return q;
 }
 
@@ -173,8 +174,9 @@ struct tNo* inclui (struct tNo *no, int c, struct tNo *r){
       novoNo->cor = PRETO;
       return novoNo;
   }
-  struct tNo *pai, *raiz = r;
-  while (no->tipo != NO_NULO)  {
+  struct tNo *pai = r;
+  
+  while (no->tipo != NO_NULO) {
       pai = no;
       if ( c < no->chave)
           no = no->esq;
@@ -187,8 +189,8 @@ struct tNo* inclui (struct tNo *no, int c, struct tNo *r){
   else
       pai->dir = novoNo;
   novoNo->pai = pai;
-  raiz = ajustaInclusao(novoNo, raiz);
-  return raiz;        
+  r = ajustaInclusao(novoNo, r);
+  return r;        
 }
 
 struct tNo *ajustaExclusao (struct tNo *no, struct tNo *raiz){
@@ -286,23 +288,23 @@ struct tNo* exclui (struct tNo *no, struct tNo *raiz) {
     struct tNo *filhoAjuste = NULL;
     struct tNo *paiAjuste = NULL;
     if (no->esq->tipo == NO_NULO && no->dir->tipo == NO_NULO && no->pai->tipo == NO_NULO){
-        freeNo(no); //exclusão da raiz, último nó
+        free(no); //exclusão da raiz, último nó
         return NULL;
     }
     if (no->esq->tipo == NO_NULO){     
         filhoAjuste = no->dir;
         ajustaNoPai(no, no->dir);
         if (no == raiz) novaRaiz = filhoAjuste;
-       freeNo (no);
+       free(no);
     } else {
         if (no->dir->tipo == NO_NULO){
             filhoAjuste = no->esq; 
             ajustaNoPai(no, no->esq);
             if (no == raiz) novaRaiz = filhoAjuste;
-            freeNo(no);
+            free(no);
         }
         else {   
-            s = sucessor (no);
+            s = antecessor(no);
             cor_no = s->cor;
             filhoAjuste = s->dir;
             ajustaNoPai(s, filhoAjuste);
@@ -320,6 +322,7 @@ struct tNo* exclui (struct tNo *no, struct tNo *raiz) {
     if (cor_no == PRETO)
         novaRaiz = ajustaExclusao(filhoAjuste, novaRaiz);
     return novaRaiz;
+}
 
 struct tNo *busca(struct tNo *no, int chave){
   if (no->tipo == NO_NULO) return NULL;
@@ -418,4 +421,19 @@ void printVetor(int vetor[]){
         printf("%d; ", vetor[i]);
     }
     printf("\n");
+}
+
+void imprimeArvore(struct tNo *raiz) {
+    if(raiz == NULL){
+        printf("Arvore vazia | raiz nula");
+        return;
+    }
+    printf("%d(",raiz->chave);
+    if (raiz->esq->tipo != NO_NULO)
+        imprimeArvore(raiz->esq);
+    printf(")(");
+    if (raiz->esq->tipo != NO_NULO)
+        imprimeArvore(raiz->dir);
+    printf(")");
+    return;
 }

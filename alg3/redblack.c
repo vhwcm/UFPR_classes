@@ -6,48 +6,47 @@
 #define BLACK 0
 
 // Estrutura do nó
-typedef struct Node {
+struct Node {
     int key;
     int color;
     struct Node *parent;
     struct Node *left;
     struct Node *right;
-} Node;
+};
 
 // Estrutura da árvore contendo a raiz e o sentinela NIL
-typedef struct Tree {
+struct Tree {
     struct Node *NIL; // Nó sentinela (NIL) - Representa todas as folhas nulas
     struct Node *root;
-} Tree;
+};
 
 // Ponteiro global para a estrutura da Árvore
-Tree *redBlack;
+struct Tree *redBlack;
 
 // --- Protótipos das Funções ---
-Node* createNode(int key);
-void leftRotate(Node *x); 
-void rightRotate(Node *y); 
-void insertFixup(Node *z); 
+struct Node* createNode(int key);
+void leftRotate(struct Node *x); 
+void rightRotate(struct Node *y); 
+void insertFixup(struct Node *z); 
 void insert(int key); 
-void transplant(Node *u, Node *v); 
-Node* maximum(Node *x);
-void deleteFixup(Node *x); 
-void deleteNode(Node *z); 
-Node* search(int key);
-void printParenthesized(Node *node);
-void printInOrder(Node *node, int level);
-void freeTree(Node *node);
+void transplant(struct Node *u, struct Node *v); 
+struct Node* maximum(struct Node *x);
+void deleteFixup(struct Node *x); 
+void deleteNode(struct Node *z); 
+struct Node* search(int key);
+void printInOrder(struct Node *node, int level);
+void freeTree(struct Node *node);
 
 int main() {
     // Inicializa a estrutura global da Árvore
-    redBlack = (Tree*)malloc(sizeof(Tree));
+    redBlack = (struct Tree*)malloc(sizeof(struct Tree));
     if (redBlack == NULL) {
         fprintf(stderr, "Falha na alocação de memória para a Árvore Rubro-Negra.\n");
         return 1;
     }
 
     // Inicializa o nó sentinela NIL
-    redBlack->NIL = (Node*)malloc(sizeof(Node));
+    redBlack->NIL = (struct Node*)malloc(sizeof(struct Node));
     if (redBlack->NIL == NULL) {
         fprintf(stderr, "Falha na alocação de memória para o nó NIL.\n");
         free(redBlack); // Libera a estrutura da árvore se a alocação do NIL falhar
@@ -69,7 +68,7 @@ int main() {
         if (op == 'i') {
             insert(key); // insere a nova chave
         } else if (op == 'r') {
-            Node *node_to_delete = search(key); // Procura a chave
+            struct Node *node_to_delete = search(key); // Procura a chave
             if (node_to_delete != redBlack->NIL) {
                 deleteNode(node_to_delete); // Deleta o no, se existir
             } else {
@@ -90,8 +89,8 @@ int main() {
 
 // --- Implementações das Funções ---
 
-Node* createNode(int key) {
-    Node *newNode = (Node*)malloc(sizeof(Node));
+struct Node* createNode(int key) {
+    struct Node *newNode = (struct Node*)malloc(sizeof(struct Node));
      if (newNode == NULL) {
         fprintf(stderr, "Falha na alocação de memória para novo nó.\n");
         exit(EXIT_FAILURE); // Sai se a alocação do nó falhar
@@ -104,8 +103,8 @@ Node* createNode(int key) {
     return newNode;
 }
 
-void leftRotate(Node *x) {
-    Node *y = x->right;
+void leftRotate(struct Node *x) {
+    struct Node *y = x->right;
     x->right = y->left; // Filho da direita de x vira seu neto
     if (y->left != redBlack->NIL) {
         y->left->parent = x;
@@ -122,8 +121,8 @@ void leftRotate(Node *x) {
     x->parent = y;
 }
 
-void rightRotate(Node *y) {
-    Node *x = y->left; 
+void rightRotate(struct Node *y) {
+    struct Node *x = y->left; 
     y->left = x->right; // Filho da esquerda de y vira seu neto
     if (x->right != redBlack->NIL) {
         x->right->parent = y;
@@ -141,8 +140,8 @@ void rightRotate(Node *y) {
 }
 
 // Restaura as propriedades Rubro-Negras após a inserção
-void insertFixup(Node *z) {
-    Node *y; // Nó tio
+void insertFixup(struct Node *z) {
+    struct Node *y; // Nó tio
     while (z->parent->color == RED) { // Enquanto o pai de z for VERMELHO (violação da propriedade 4)
         if (z->parent == z->parent->parent->left) { // Pai de z é filho esquerdo do avô
             y = z->parent->parent->right; // Tio de z é o filho direito do avô
@@ -187,9 +186,9 @@ void insertFixup(Node *z) {
 
 // Insere uma chave na árvore
 void insert(int key) {
-    Node *z = createNode(key); // Cria o novo nó (VERMELHO, folhas são NIL)
-    Node *y = redBlack->NIL; // Ponteiro auxiliar, se tornará o pai de z
-    Node *x = redBlack->root; // Começa a busca a partir da raiz global
+    struct Node *z = createNode(key); // Cria o novo nó (VERMELHO, folhas são NIL)
+    struct Node *y = redBlack->NIL; // Ponteiro auxiliar, se tornará o pai de z
+    struct Node *x = redBlack->root; // Começa a busca a partir da raiz global
 
     // Encontra a posição para o novo nó
     while (x != redBlack->NIL) {
@@ -215,7 +214,7 @@ void insert(int key) {
 }
 
 // Coloca o no v no lugar de u
-void transplant(Node *u, Node *v) {
+void transplant(struct Node *u, struct Node *v) {
     if (u->parent == redBlack->NIL) {
         redBlack->root = v; // Atualiza a raiz global
     } else if (u == u->parent->left) {
@@ -227,7 +226,7 @@ void transplant(Node *u, Node *v) {
 }
 
 // Encontra o nó com a chave máxima na subárvore enraizada em x
-Node* maximum(Node *x) {
+struct Node* maximum(struct Node *x) {
     // Percorre para direita ate o fim
     while (x->right != redBlack->NIL) {
         x = x->right;
@@ -237,8 +236,8 @@ Node* maximum(Node *x) {
 
 // Restaura as propriedades da Rubro-Negra após a remoção
 // Essa aqui e complicada
-void deleteFixup(Node *x) {
-    Node *w; // Nó irmão de x
+void deleteFixup(struct Node *x) {
+    struct Node *w; // Nó irmão de x
 
     // Loop enquanto x for "duplamente preto" (implicitamente, pois é PRETO e não é a raiz)
     // e x não for a raiz
@@ -315,9 +314,9 @@ void deleteFixup(Node *x) {
 
 
 // Remove o nó z da árvore usando o antecessor (máximo da subárvore esquerda)
-void deleteNode(Node *z) {
-    Node *y = z; // Nó a ser removido ou movido dentro da árvore
-    Node *x;     // Filho que substitui y
+void deleteNode(struct Node *z) {
+    struct Node *y = z; // Nó a ser removido ou movido dentro da árvore
+    struct Node *x;     // Filho que substitui y
     int y_original_color = y->color; // Armazena a cor de y antes de qualquer mudança
 
     // Caso 1 & 2: z tem no máximo um filho
@@ -362,8 +361,8 @@ void deleteNode(Node *z) {
 
 
 // Busca por um nó com a chave dada a partir da raiz
-Node* search(int key) {
-    Node *current = redBlack->root;
+struct Node* search(int key) {
+    struct Node *current = redBlack->root;
     // Percorre a árvore como uma BST padrão
     while (current != redBlack->NIL && key != current->key) {
         if (key < current->key) {
@@ -376,7 +375,7 @@ Node* search(int key) {
 }
 
 // Realiza a travessia in-order e imprime os nós com nível e cor
-void printInOrder(Node *node, int level) {
+void printInOrder(struct Node *node, int level) {
     if (node != redBlack->NIL) {
         // Visita recursivamente a subárvore esquerda (incrementando o nível)
         printInOrder(node->left, level + 1);
@@ -390,7 +389,7 @@ void printInOrder(Node *node, int level) {
 }
 
 // Libera a memória da árvore usando travessia pós-ordem
-void freeTree(Node *node) {
+void freeTree(struct Node *node) {
     // Caso base: Se o nó é o sentinela NIL ou NULL, não faz nada
     if (node == redBlack->NIL || node == NULL) { // Verifica NULL por segurança, mas NIL deve ser a checagem principal
         return;

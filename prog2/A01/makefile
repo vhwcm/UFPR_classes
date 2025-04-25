@@ -1,2 +1,2 @@
 all: 
-	gcc lz.c main.c -o vina
+	gcc -g lz.c lista.c main.c -lm -o vina

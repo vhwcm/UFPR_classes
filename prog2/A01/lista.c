@@ -1,225 +1,254 @@
-#include"lista.h"
-#include <stddef.h>
-#include <stdlib.h>
+#include "lista.h"
 #include <stdio.h>
-
 #include <stdlib.h>
+#include <string.h> // For strcmp and strdup
+#include <time.h>   // For ctime
 
-// Cria uma nova lista vazia.
-struct lista_t *lista_cria() {
-    struct lista_t *n_lista = malloc(sizeof(struct lista_t));
-    if (n_lista == NULL) {
-        return NULL;  
+// Implementation of create_metadados
+metadados* create_metadados(const char *filename) {
+    metadados *meta = (metadados*)malloc(sizeof(metadados));
+    if (!meta) {
+        perror("Failed to allocate memory for metadados");
+        return NULL;
     }
-    //inicioaliza os valores da lista
-    n_lista->prim = NULL;
-    n_lista->ult = NULL;
-    n_lista->tamanho = 0;
-    return n_lista;
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        perror("Error opening file");
+        // Handle error, maybe return an error code or NULL
+        return NULL; // Or appropriate error handling
+    }
+
+    int fd = fileno(fp); // Get the file descriptor from the FILE stream
+    if (fd == -1) {
+        perror("Error getting file descriptor");
+        fclose(fp); // Close the file stream
+        // Handle error
+        return NULL;
+    }
+
+    struct stat file_info; // Declare the struct stat variable itself, not a pointer
+                           // fstat needs the address of an existing struct to fill.
+
+    // Pass the address of file_info to fstat
+    if (fstat(fd, &file_info) == -1) {
+        perror("Error getting file stats");
+        fclose(fp); // Close the file stream
+        // Handle error
+        return NULL;
+    }
+    snprintf(meta->nome, TAM_MAX_FILENAME + 1, "%.*s", TAM_MAX_FILENAME, filename);    // Now you can access the members of file_info:
+    meta->nome[20] = '\0';
+    printf("meta->nome = %s\n", meta->nome);
+    meta->o_size = file_info.st_size;       // File size in bytes
+    meta->c_size = meta->o_size;
+    meta->u_acesso = file_info.st_atime;    // Time of last access
+    meta->u_mod = file_info.st_mtime;       // Time of last modification
+    meta->perm = file_info.st_mode & 0777;
+    meta->pos = 0;
+    // Remember to close the file stream when done
+    fclose(fp);
+
+    return meta;
 }
 
-// Destroi todos os itens da lista e libera a memória
-struct lista_t *lista_destroi(struct lista_t *lst) {
-    if (lst == NULL) 
-        return NULL; 
-
-    struct item_t *pont = lst->prim;
-    struct item_t *prox;
-    while (pont != NULL) {
-        prox = pont->prox;
-        free(pont);
-        pont = prox;
+metadados* dump_metadados(const char *filename, unsigned int o_size, unsigned int c_size, unsigned int pos,  time_t u_acesso, time_t u_mod, mode_t perm) {
+    metadados *meta = (metadados*)malloc(sizeof(metadados));
+    if (!meta) {
+        perror("Failed to allocate memory for metadados");
+        return NULL;
     }
-    free(lst);
-    lst = NULL;
-    return lst;
+    meta->o_size = o_size;       // File size in bytes
+    meta->c_size = c_size;
+    meta->pos = pos;
+    meta->u_acesso = u_acesso;    // Time of last access
+    meta->u_mod = u_mod;       // Time of last modification
+    meta->perm = perm & 0777;
+
+    return meta;
 }
 
-//Insere  um nó na lista
-int lista_insere(struct lista_t *lst, int item, int pos) {
-    if (!lst)  
-        return -1;
-    //verifica se a posição é válida
-    if (pos > lst->tamanho || pos < -1)
-        return -1;
-
-    //cria novo nodo
-    struct item_t* pont = malloc(sizeof(struct item_t));
-    if (!pont)  
-        return -1;
-    pont->valor = item;
+// Implementation of free_metadados
+void free_metadados(metadados *meta) {
+    if (meta) {
+        free(meta->nome); 
+        free(meta);
+    }
+}
 
 
-    if (pos == -1) 
-        pos = lst->tamanho;
+void inicializa_lista(List *lista) {
+    lista->primeiro = NULL;
+    lista->ultimo = NULL;
+    lista->tamanho = 0;
+}
 
-    if (pos == 0) {
-        // Inserir no início
-        pont->prox = lst->prim;
-        pont->ant = NULL;
-        if (lst->prim)
-            lst->prim->ant = pont;
-        else
-            lst->ult = pont;
-        lst->prim = pont;
-    } else if (pos == lst->tamanho) {
-        // Inserir no fim
-        pont->prox = NULL;
-        pont->ant = lst->ult;
-        if (lst->ult)
-            lst->ult->prox = pont;
-        else
-            lst->prim = pont;
-        lst->ult = pont;
+int insere_lista(List *lista, metadados *data) {
+    ListNode *novo = (ListNode*)malloc(sizeof(ListNode));
+    if (!novo) return -1;
+    novo->data = data;
+    novo->next = NULL;
+    if (lista->ultimo) {
+        lista->ultimo->next = novo;
     } else {
-        // Inserir no meio
-        struct item_t *current;
-        if (pos <= lst->tamanho / 2) {
-            current = lst->prim;
-            for (int i = 0; i < pos; i++)
-                current = current->prox;
-        } else {
-            current = lst->ult;
-            for (int i = lst->tamanho - 1; i > pos; i--)
-                current = current->ant;
+        lista->primeiro = novo;
+    }
+    lista->ultimo = novo;
+    lista->tamanho++;
+    return 0;
+}
+
+int remove_lista(List *lista, const char *nome) {
+    ListNode *atual = lista->primeiro, *anterior = NULL;
+    while (atual) {
+        if (atual->data && atual->data->nome && strcmp(atual->data->nome, nome) == 0) {
+            if (anterior) {
+                anterior->next = atual->next;
+            } else {
+                lista->primeiro = atual->next;
+            }
+            if (atual == lista->ultimo) {
+                lista->ultimo = anterior;
+            }
+            free_metadados(atual->data);
+            free(atual);
+            lista->tamanho--;
+            return 0;
         }
-        pont->prox = current;
-        pont->ant = current->ant;
-        if (current->ant)
-            current->ant->prox = pont;
-        current->ant = pont;
-    }
-    // Incrementa o tamanho da lista e retorna
-    return ++(lst->tamanho); 
-}
-
-
-int lista_retira(struct lista_t *lst, int *item, int pos) {
-    if (!lst) 
-        return -1;
-
-    // Verifica se a lista está vazia ou se a posição é inválida
-    if (lst->tamanho == 0 || pos < -1 || pos >= lst->tamanho) 
-        return -1;
-
-
-    struct item_t* pont;
-    if (pos == -1) {
-        // Remover o último item da lista
-        pont = lst->ult;
-        *item = pont->valor;
-        if (lst->tamanho == 1) {
-            lst->prim = NULL;
-            lst->ult = NULL;
-        } else {
-            pont->ant->prox = NULL;
-            lst->ult = pont->ant;
-        }
-        free(pont);
-        return --(lst->tamanho);
-    }
-
-    if (pos <= lst->tamanho / 2) {
-        pont = lst->prim;
-        for (int i = 0; i < pos; i++)
-            pont = pont->prox;
-    } else {
-        pont = lst->ult;
-        for (int i = lst->tamanho - 1; i > pos; i--)
-            pont = pont->ant;
-    }
-
-    *item = pont->valor;
-
-    if (pont == lst->prim) {
-        // Remover o primeiro item da lista
-        lst->prim = pont->prox;
-        if (lst->prim)
-            lst->prim->ant = NULL;
-        else
-            lst->ult = NULL;
-    } else if (pont == lst->ult) {
-        // Remover o último item da lista
-        lst->ult = pont->ant;
-        if (lst->ult)
-            lst->ult->prox = NULL;
-        else
-            lst->prim = NULL;
-    } else {
-        // Remover um item no meio da lista
-        pont->ant->prox = pont->prox;
-        pont->prox->ant = pont->ant;
-    }
-
-    free(pont);
-    return --(lst->tamanho);
-}
-
-//coloca um o valor de uma posição em *item e retorna o tamanho da lista
-int lista_consulta(struct lista_t *lst, int *item, int pos) {
-    if (!lst)  
-        return -1;
-
-    if (lst->tamanho == 0 || pos >= lst->tamanho)  // Verifica se a lista está vazia
-        return -1;
-
-    struct item_t* pont;
-    if (pos == -1) {
-        // Retorna o valor do último item
-        *item = lst->ult->valor;
-        return lst->tamanho;
-    }
-
-    if (pos <= lst->tamanho / 2) {
-        pont = lst->prim;
-        for (int i = 0; i < pos; i++) 
-            pont = pont->prox;
-    } else {
-        pont = lst->ult;
-        for (int i = lst->tamanho - 1; i > pos; i--) 
-            pont = pont->ant;
-    }
-
-    *item = pont->valor;  //item recebe o valor de determinada posição
-
-    return lst->tamanho;
-}
-
-// Informa a posição da 1ª ocorrência do valor indicado na lista.
-int lista_procura (struct lista_t *lst, int valor){
-    if(!lst) return -1;
-    struct item_t* pont = lst->prim;
-    int pos = 0;
-    //procura até chegar no final e retornar -1 caso não seja encontrado o valor
-    while(pont != NULL){
-        if(pont->valor == valor){
-            return pos;
-        }
-        pos++;
-        pont = pont->prox;
-    }
-   return -1;
-}
-
-
-int lista_tamanho (struct lista_t *lst){
-    if(lst){
-        return lst->tamanho;
+        anterior = atual;
+        atual = atual->next;
     }
     return -1;
 }
 
-//imprie a lista toda
-void lista_imprime(struct lista_t *lst) {
-    if (!lst || lst->tamanho == 0) return; 
-    
-    struct item_t* pont = lst->prim;
-    while (pont != NULL) {
-        printf("%d", pont->valor);
-        pont = pont->prox;
-        if (pont != NULL) {
-            printf(" ");
+ListNode* busca_lista(List *lista, const char *nome) {
+    ListNode *atual = lista->primeiro;
+    while (atual) {
+        if (atual->data && atual->data->nome && strcmp(atual->data->nome, nome) == 0) {
+            return atual;
         }
+        atual = atual->next;
     }
+    return NULL;
+}
+
+void libera_lista(List *lista) {
+    ListNode *atual = lista->primeiro;
+    while (atual) {
+        ListNode *prox = atual->next;
+        free_metadados(atual->data);
+        free(atual);
+        atual = prox;
+    }
+    lista->primeiro = NULL;
+    lista->ultimo = NULL;
+    lista->tamanho = 0;
+}
+
+void imprime_lista(List *lista) {
+    ListNode *atual = lista->primeiro;
+    printf("--- Lista de Metadados ---\n");
+    while (atual) {
+        if (atual->data) {
+            printf("  Nome: %s\n", atual->data->nome ? atual->data->nome : "(null)");
+            printf("  Tamanho: %u bytes\n", atual->data->o_size);
+            printf("  Posição: %u\n", atual->data->pos);
+            char time_buf[30];
+            struct tm *tm_info;
+            tm_info = localtime(&atual->data->u_acesso);
+            if (tm_info && strftime(time_buf, sizeof(time_buf), "%c", tm_info))
+                printf("  Último Acesso: %s\n", time_buf);
+            else
+                printf("  Último Acesso: (invalid time)\n");
+            tm_info = localtime(&atual->data->u_mod);
+            if (tm_info && strftime(time_buf, sizeof(time_buf), "%c", tm_info))
+                printf("  Última Modificação: %s\n", time_buf);
+            else
+                printf("  Última Modificação: (invalid time)\n");
+            printf("  Permissões: %o\n", atual->data->perm);
+            printf("  ----\n");
+        }
+        atual = atual->next;
+    }
+    printf("--- Fim da Lista ---\n");
+}
+
+int escreve_metadados_arquivo(FILE *arquivo, List *lista) {
+    if (!arquivo || !lista) return -1;
+
+    ListNode *atual = lista->primeiro;
+    unsigned int tamm ;
+    while (atual) {
+        if (atual->data) {
+            metadados *meta = atual->data;
+
+            if (fwrite(meta->nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != TAM_MAX_FILENAME) return -1;  
+             tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever nome\n", tamm);
+            if (fwrite(&meta->o_size, sizeof(unsigned int), 1, arquivo) != 1) return -1;
+              tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever o_size\n", tamm);
+            if (fwrite(&meta->c_size, sizeof(unsigned int), 1, arquivo) != 1) return -1;
+            tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever u_size\n", tamm);
+            if (fwrite(&meta->pos, sizeof(unsigned int), 1, arquivo) != 1) return -1;
+              tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever pos\n", tamm);
+            if (fwrite(&meta->u_acesso, sizeof(time_t), 1, arquivo) != 1) return -1;
+              tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever u_acess\n", tamm);
+            if (fwrite(&meta->u_mod, sizeof(time_t), 1, arquivo) != 1) return -1;
+              tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever u_mod\n", tamm);
+            if (fwrite(&meta->perm, sizeof(mode_t), 1, arquivo) != 1) return -1;
+              tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever perm\n", tamm);
+        }
+        atual = atual->next;
+    }
+    fwrite(&lista->tamanho ,sizeof(int),1,arquivo);
+    tamm = ftell(arquivo);
+            printf("\npos %d tam bytes, apos escrever tamanho\n", tamm);    
+    return 0; // Sucesso
+}
+
+int le_metadados_arquivo(FILE *arquivo, List *lista, unsigned int tam) {
+    if (!arquivo || !lista) return -1;
+    unsigned int metadado_id = 0;
+    int posic = ftell(arquivo);
+    printf("\nposic: %d\n", posic);
+    while (metadado_id < tam) {        // Tenta ler o tamanho do nome
+        char nome[21];
+        if (fread(nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != TAM_METADADOS) {
+            nome[20] = '\0';
+        } else {
+            return -1;
+        }
+
+        unsigned int o_size, c_size, pos;
+        time_t u_acesso, u_mod;
+        mode_t perm;
+
+        // Lê os outros campos
+        fread(&o_size, sizeof(unsigned int), 1, arquivo);
+        fread(&c_size, sizeof(unsigned int), 1, arquivo);
+        fread(&pos, sizeof(unsigned int), 1, arquivo);
+        fread(&u_acesso, sizeof(time_t), 1, arquivo);
+        fread(&u_mod, sizeof(time_t), 1, arquivo);
+        fread(&perm, sizeof(mode_t), 1, arquivo);
+
+        // Cria o metadados (create_metadados faz strdup do nome)
+        metadados *novo_meta = dump_metadados(nome, o_size, c_size, pos, u_acesso, u_mod, perm);
+
+        if (!novo_meta) return -1; // Erro na criação do metadados
+
+        // Insere na lista
+        if (insere_lista(lista, novo_meta) != 0) {
+            free_metadados(novo_meta); // Libera metadados se a inserção falhar
+            return -1; // Erro na inserção
+        }
+        metadado_id++;
+    }
+
+    return 0; // Sucesso
 }
 

@@ -14,6 +14,7 @@ int handle_p(const char *filename, FILE *archive, List *dir);
 
 int handle_compress(const char *filename, FILE *archive, List *dir);
 
+int ler_diretorio_arquivo(FILE *archive, List* directory);
 // Function to handle the 'c' (compress and add) option
 
 
@@ -35,39 +36,8 @@ int main (int argc, char *argv[]) {
     List *directory = (List*)malloc(sizeof(List)); // Initialize to NULL
     if (!directory)
         return 2; 
-    int tam_directory = 0;
-    
-    // Attempt to read existing directory (basic example, needs robust error handling)
-    fseek(archive, 0, SEEK_END);
-    long archive_size = ftell(archive);
-    if (archive_size >= sizeof(int)) {
-        // Corrected fseek and fread
-        if (fseek(archive, -(sizeof(int)), SEEK_END) == 0) {
-            if (fread(&tam_directory, sizeof(int), 1, archive) == 1) {
-                 printf("Tamanho do diretório lido: %d\n", tam_directory);
-                 // Basic sanity check for directory size
-                if (tam_directory > 0 && tam_directory < archive_size) {
-                     // Position before the directory data
-                     if (fseek(archive, -tam_directory*sizeof(metadados) - sizeof(int), SEEK_END) == 0) {
-                         // This simple fread won't work for complex structs with pointers
-                        fprintf(stderr, "\ntam-directory*sizeof(metadado) - sizeof(int) == %ld\n", tam_directory*sizeof(metadados) - sizeof(int));
-                        le_metadados_arquivo(archive,directory,tam_directory); //magic
-                     } else {
-                         perror("Erro ao posicionar para leitura do diretório");
-                     }
-                } else {
-                    printf("Tamanho do diretório inválido encontrado: %d\n", tam_directory);
-                }
-            } else {
-                 perror("Erro ao ler tamanho do diretório do arquivo");
-            }
-        } else {
-             perror("Erro ao posicionar para leitura do tamanho do diretório");
-            }
-    } else {
-        inicializa_lista(directory);
-        printf("Arquivo de arquivamento vazio ou muito pequeno para conter um diretório.\n");
-    }
+
+    int tam_directory = ler_diretorio_arquivo(archive, directory);
 
 
     // Process command line options
@@ -315,4 +285,34 @@ int handle_p(const char *filename, FILE *archive, List *dir) {
     return 0; // Indicate success
 }
 
-
+int ler_diretorio_arquivo(FILE *archive, List* directory){
+    fseek(archive, 0, SEEK_END);
+    long archive_size = ftell(archive);
+    int tam_directory = 0;
+    if (archive_size >= sizeof(int)) { // se o arquivo não está vaziu
+        // Corrected fseek and fread
+        if (fseek(archive, -(sizeof(int)), SEEK_END) == 0) { // se conseguiu ler o tamnho de desição
+            if (fread(&tam_directory, sizeof(int), 1, archive) == 1) { // se conseguiu ler e guardar na variavel tam_directory
+                 printf("Tamanho do diretório lido: %d\n", tam_directory);
+                     if (fseek(archive, -(tam_directory*TAM_METADADOS + sizeof(int)), SEEK_END) == 0) {
+                         // This simple fread won't work for complex structs with pointers
+                        fprintf(stderr, "\n-(tam_directory*TAM_METADADOS + sizeof(int)) == %ld\n", tam_directory*TAM_METADADOS  + sizeof(int));
+                        le_metadados_arquivo(archive,directory,tam_directory); //magic
+                        return tam_directory;
+                     } else {
+                         perror("Erro ao posicionar para leitura do diretório");
+                     }
+            } else {
+                 perror("Erro ao ler tamanho do diretório do arquivo");
+                 return -2;
+            }
+        } else {
+             perror("Erro ao posicionar para leitura do tamanho do diretório");
+             return - 1;
+        }
+    } else {
+        inicializa_lista(directory);
+        printf("Arquivo de arquivamento vazio ou muito pequeno para conter um diretório.\n");
+        return 0;
+    }
+}

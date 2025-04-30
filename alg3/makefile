@@ -1,2 +1,2 @@
-all: redblack.c
+all: 
 	gcc redblack.c -o myrn

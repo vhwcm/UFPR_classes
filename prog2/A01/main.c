@@ -21,6 +21,10 @@ int ler_diretorio_arquivo(FILE *archive, List* directory);
 int main (int argc, char *argv[]) {
     // Use "ab+" for appending in binary mode, create if not exists
     // Or "rb+" if you need to read/write existing data before appending
+    if (argc < 3){
+        printf("Formato Incorreto!\nUtilize: ./vina -[arg] [arquive] [arquivo1...arquivon]\n");
+        return -1;
+    }
     FILE *archive = fopen("archive.vc", "rb+");
     if (!archive) {
         // Se falhar, talvez o arquivo não exista, tente criar com "wb+"
@@ -41,7 +45,7 @@ int main (int argc, char *argv[]) {
 
 
     // Process command line options
-    while ((next_option = getopt(argc, argv, "c:p:x:")) != -1) { // Added 'x:' for consistency
+
         switch (next_option)
         {
         case 'i':

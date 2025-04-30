@@ -37,7 +37,7 @@ typedef struct List {
     size_t tamanho;
 } List;
 
-metadados* create_metadados(const char *filename);
+metadados* criar_metadados(const char *filename);
 metadados* dump_metadados(const char *filename, unsigned int o_size, unsigned int c_size, unsigned int pos,  time_t u_acesso, time_t u_mod, mode_t perm);
 
 /**

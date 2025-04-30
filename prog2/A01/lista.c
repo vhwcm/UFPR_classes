@@ -4,8 +4,8 @@
 #include <string.h> // For strcmp and strdup
 #include <time.h>   // For ctime
 
-// Implementation of create_metadados
-metadados* create_metadados(const char *filename) {
+// Implementation of criar_metadados
+metadados* criar_metadados(const char *filename) {
     metadados *meta = (metadados*)malloc(sizeof(metadados));
     if (!meta) {
         perror("Failed to allocate memory for metadados");
@@ -236,7 +236,7 @@ int le_metadados_arquivo(FILE *arquivo, List *lista, unsigned int tam) {
         fread(&u_mod, sizeof(time_t), 1, arquivo);
         fread(&perm, sizeof(mode_t), 1, arquivo);
 
-        // Cria o metadados (create_metadados faz strdup do nome)
+        // Cria o metadados (criar_metadados faz strdup do nome)
         metadados *novo_meta = dump_metadados(nome, o_size, c_size, pos, u_acesso, u_mod, perm);
 
         if (!novo_meta) return -1; // Erro na criação do metadados

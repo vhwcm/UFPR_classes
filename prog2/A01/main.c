@@ -43,20 +43,24 @@ int main (int argc, char *argv[]) {
         int tam_diretorio = ler_diretorio_arquivo(arquivo, diretorio);
 
         argumento_atual++;
+        if (tam_diretorio) {
+            fseek(arquivo, -(tam_diretorio * TAM_METADADOS + sizeof(int)), SEEK_END);
+            long posicao = ftell(arquivo);
+            printf("\nPosição no arquivo: %ld e tam_diretorio * TAM_METADADOS + sizeof(int) = %ld\n", posicao, tam_diretorio * TAM_METADADOS + sizeof(int));
+        } else {
+            printf("\nDiretório vazio\n");
+        }
 
         while (argumento_atual < argc) {
-            if (tam_diretorio) {
-                fseek(arquivo, -(tam_diretorio * TAM_METADADOS + sizeof(int)), SEEK_END);
-                long posicao = ftell(arquivo);
-                printf("\nPosição no arquivo: %ld e tam_diretorio * TAM_METADADOS + sizeof(int) = %ld\n", posicao, tam_diretorio * TAM_METADADOS + sizeof(int));
-            } else {
-                printf("\nDiretório vazio\n");
-            }
             if (inserir_p(argv[argumento_atual], arquivo, diretorio) != 0) {
                 fprintf(stderr, "Falha ao processar a opção -p para %s\n", opcao);
             }
             imprime_lista(diretorio);
             argumento_atual++;
+        }
+
+        if (escreve_metadados_arquivo(arquivo, diretorio)) {
+            fprintf(stderr, "Erro ao escrever metadados");
         }
         
     } else if (strcmp(opcao, "-ic") == 0) {
@@ -261,9 +265,6 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, List *diretorio) {
     }
 
     insere_lista(diretorio, fmeta);
-    if (escreve_metadados_arquivo(arquivo, diretorio)) {
-        fprintf(stderr, "Erro ao escrever metadados");
-    }
     
     posicao = ftell(arquivo);
     printf("\nFinalizado com %d tam bytes\n", posicao);
@@ -276,12 +277,16 @@ int ler_diretorio_arquivo(FILE *arquivo, List* diretorio) {
     fseek(arquivo, 0, SEEK_END);
     long tamanho_arquivo = ftell(arquivo);
     int tam_diretorio = 0;
+    long pos;
     if (tamanho_arquivo >= sizeof(int)) {
         if (fseek(arquivo, -(sizeof(int)), SEEK_END) == 0) {
+            pos = ftell(arquivo);
+            fprintf(stderr, "\npos apos ler o int: %ld\n", pos);
             if (fread(&tam_diretorio, sizeof(int), 1, arquivo) == 1) {
                 printf("Tamanho do diretório lido: %d\n", tam_diretorio);
                 if (fseek(arquivo, -(tam_diretorio * TAM_METADADOS + sizeof(int)), SEEK_END) == 0) {
-                    fprintf(stderr, "\n-(tam_diretorio * TAM_METADADOS + sizeof(int)) == %ld\n", tam_diretorio * TAM_METADADOS + sizeof(int));
+                    pos = ftell(arquivo);
+                    fprintf(stderr, "\npos: %ld \n-(tam_diretorio * TAM_METADADOS + sizeof(int)) == %ld\n", pos, tam_diretorio * TAM_METADADOS + sizeof(int));
                     le_metadados_arquivo(arquivo, diretorio, tam_diretorio);
                     return tam_diretorio;
                 } else {

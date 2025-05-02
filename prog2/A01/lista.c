@@ -57,6 +57,7 @@ metadados* dump_metadados(const char *filename, unsigned int o_size, unsigned in
         perror("Failed to allocate memory for metadados");
         return NULL;
     }
+    strcpy(meta->nome, filename);
     meta->o_size = o_size;       // File size in bytes
     meta->c_size = c_size;
     meta->pos = pos;

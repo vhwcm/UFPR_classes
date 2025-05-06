@@ -1,0 +1,185 @@
+**Instruções da Arquitetura REDUX-V (8 bits)**
+
+---
+
+### Formato das Instruções
+
+**Tipo R:** `Opcode (4 bits)` | `Ra (2 bits)` | `Rb (2 bits)`
+**Tipo I:** `Opcode (4 bits)` | `Immediate (4 bits)`
+
+Registradores:
+
+- `00`: R0
+- `01`: R1
+- `10`: R2
+- `11`: R3
+
+---
+
+### Instruções Padrão
+
+| Opcode | Tipo | Mnemonic | Operação                   | Descrição                |
+| ------ | ---- | -------- | -------------------------- | ------------------------ |
+| 0000   | R    | brzr     | if (R[ra] == 0) PC = R[rb] | Desvia se R[ra] for zero |
+| 0001   | I    | ji       | PC = PC + Imm              | Pula para PC + imediato  |
+| 0010   | R    | ld       | R[ra] = M[R[rb]]           | Carrega da memória       |
+| 0011   | R    | st       | M[R[rb]] = R[ra]           | Armazena na memória      |
+| 0100   | I    | addi     | R[0] = R[0] + Imm          | Soma imediato com R0     |
+| 1000   | R    | not      | R[ra] = NOT R[rb]          | Não lógico               |
+| 1001   | R    | and      | R[ra] = R[ra] AND R[rb]    | E lógico                 |
+| 1010   | R    | or       | R[ra] = R[ra] OR R[rb]     | OU lógico                |
+| 1011   | R    | xor      | R[ra] = R[ra] XOR R[rb]    | OU-exclusivo             |
+| 1100   | R    | add      | R[ra] = R[ra] + R[rb]      | Soma entre registradores |
+| 1101   | R    | sub      | R[ra] = R[ra] - R[rb]      | Subtração                |
+| 1110   | R    | slr      | R[ra] = R[ra] << R[rb]     | Deslocamento à esquerda  |
+| 1111   | R    | srr      | R[ra] = R[ra] >> R[rb]     | Deslocamento à direita   |
+
+---
+
+### Instruções Criadas pelo Aluno
+
+| Opcode | Tipo                  | Mnemonic | Operação                   | Descrição                                                    |
+| ------ | --------------------- | -------- | -------------------------- | ------------------------------------------------------------ |
+| 0101   | I                     | bnzi     | if (r3 != 0) PC = PC + Imm | Branch se r0 !=  0.  pc -= imediato                          |
+| 0110   | I                     | add2i    | R[0] += 2*Imm             | soma o imediato x 2                                          |
+| 0111   | H(novo, h de hibrido) | addri    | R[ra] += imm(de 2 bits)    | soma o imediato a um registrador qualquer, limitado a 2 bits |
+
+---
+
+### Sinais de Controle por Instrução
+
+| Mnemonic | write | branch | jump | bnzi | store | load | hibrido |
+|----------|-------|--------|------|------|-------|------|---------|
+| brzr     | 0     | 1      | 0    | 0    | 0     | 0    | 0       |
+| ji       | 0     | 0      | 1    | 0    | 0     | 0    | 0       |
+| ld       | 1     | 0      | 0    | 0    | 0     | 1    | 0       |
+| st       | 0     | 0      | 0    | 0    | 1     | 0    | 0       |
+| addi     | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| not      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| and      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| or       | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| xor      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| add      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| sub      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| slr      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| srr      | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| bnzi     | 0     | 0      | 0    | 1    | 0     | 0    | 0       |
+| add2i    | 1     | 0      | 0    | 0    | 0     | 0    | 0       |
+| addri    | 1     | 0      | 0    | 0    | 0     | 0    | 1       |
+
+---
+
+### Mapas de Karnaugh para Geração dos Sinais de Controle
+
+**Legenda**: A = opcode[3], B = opcode[2], C = opcode[1], D = opcode[0]
+
+#### Mapa de Karnaugh para `write`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  0   0   0   1
+01 |  1   0   1   1
+11 |  1   1   1   1
+10 |  1   1   1   1
+```
+**Expressão simplificada (SOP)**:
+```
+write = A + (B & (C + ¬D))
+```
+
+#### Mapa de Karnaugh para `branch`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  1   0   0   0
+01 |  0   0   0   0
+11 |  0   0   0   0
+10 |  0   0   0   0
+```
+```
+branch = ¬A & ¬B & ¬C & ¬D
+```
+
+#### Mapa de Karnaugh para `jump`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  0   1   0   0
+01 |  0   0   0   0
+11 |  0   0   0   0
+10 |  0   0   0   0
+```
+```
+jump = ¬A & ¬B & ¬C & D
+```
+
+#### Mapa de Karnaugh para `bnzi`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  0   0   0   0
+01 |  0   1   0   0
+11 |  0   0   0   0
+10 |  0   0   0   0
+```
+```
+bnzi = ¬A & B & ¬C & ¬D
+```
+
+#### Mapa de Karnaugh para `store`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  0   0   0   0
+01 |  0   0   0   0
+11 |  0   0   0   0
+10 |  0   0   0   0
+```
+*Obs: `store` ocorre em 0011 (AB=00, C=1, D=1).*  
+```
+store = ¬A & ¬B & C & D
+```
+
+#### Mapa de Karnaugh para `load`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  0   0   0   0
+01 |  0   0   0   0
+11 |  0   0   0   0
+10 |  0   0   0   0
+```
+*Obs: `load` ocorre em 0010 (AB=00, C=1, D=0).*  
+```
+load = ¬A & ¬B & C & ¬D
+```
+
+#### Mapa de Karnaugh para `hibrido`
+```
+        CD
+      00 01 11 10
+AB +-------------------
+00 |  0   0   0   0
+01 |  0   0   1   0
+11 |  0   0   0   0
+10 |  0   0   0   0
+```
+```
+hibrido = ¬A & B & C & D
+```
+
+---
+
+*Revise as observações para `store` e `load`, que são mapas de um único mintermo. As expressões agora refletem exatamente o opcode correspondente.*
+
+
+rom func:
+
+0 0 0 0 0 0 0 0
+2 3 4 5 0 1 6 7

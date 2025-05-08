@@ -4,41 +4,57 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
-#include <sys/stat.h> // For mode_t
+#include <sys/stat.h>  // For mode_t
 #include <sys/types.h> // For time_t
 // Define the metadados structure (assuming it's defined elsewhere or define it here)
 // If defined elsewhere, ensure that header is included before this one.
 // For self-containment, let's define it here based on the provided main.c
 
-#define TAM_MAX_FILENAME 20
-#define TAM_METADADOS 52
+#define TAM_MAX_FILENAME 1024
+#define TAM_NOME_NO_DISCO TAM_MAX_FILENAME
+#define TAM_UID_NO_DISCO sizeof(uid_t)
+#define TAM_OSIZE_NO_DISCO sizeof(unsigned int)
+#define TAM_CSIZE_NO_DISCO sizeof(unsigned int)
+#define TAM_UMOD_NO_DISCO sizeof(time_t)
+#define TAM_PERM_NO_DISCO sizeof(mode_t)
+#define TAM_POS_NO_DISCO sizeof(unsigned int)
+#define TAM_LOCAL_NO_DISCO sizeof(unsigned int)
 
+#define TAM_METADADOS_NO_DISCO (TAM_NOME_NO_DISCO + TAM_UID_NO_DISCO +    \
+                                TAM_OSIZE_NO_DISCO + TAM_CSIZE_NO_DISCO + \
+                                TAM_UMOD_NO_DISCO + TAM_PERM_NO_DISCO +   \
+                                TAM_POS_NO_DISCO + TAM_LOCAL_NO_DISCO)
 
-typedef struct metadados {
+typedef struct metadados
+{
     char nome[TAM_MAX_FILENAME + 1];
+    uid_t uid;
     unsigned int o_size; // Original size
     unsigned int c_size; // compressed size
-    unsigned int pos; // Position in the archive file
-    time_t u_acesso;  // Last access time
-    time_t u_mod;     // Last modification time
-    mode_t perm;      // File permissions
+    time_t u_mod;        // Last modification time
+    mode_t perm;         // File permissions
+    unsigned int pos;    // Position in the archive file
+    unsigned int local;
 } metadados;
 
 // Define the structure for a node in the linked list
-typedef struct ListNode {
+typedef struct ListNode
+{
     metadados *data;
     struct ListNode *next;
 } ListNode;
 
 // Nova estrutura para a lista
-typedef struct List {
+typedef struct List
+{
     ListNode *primeiro;
     ListNode *ultimo;
     size_t tamanho;
 } List;
 
-metadados* criar_metadados(const char *filename);
-metadados* dump_metadados(const char *filename, unsigned int o_size, unsigned int c_size, unsigned int pos,  time_t u_acesso, time_t u_mod, mode_t perm);
+metadados *criar_metadados(const char *filename);
+metadados *dump_metadados(const char *filename, uid_t uid, unsigned int o_size, unsigned int c_size,
+                          time_t u_mod, mode_t perm, unsigned int pos, unsigned int local);
 
 /**
  * @brief Frees the memory allocated for a metadados struct, including the name.
@@ -55,7 +71,7 @@ void inicializa_lista(List *lista);
 int remove_lista(List *lista, const char *nome);
 
 // Busca um nó pelo nome
-ListNode* busca_lista(List *lista, const char *nome);
+ListNode *busca_lista(List *lista, const char *nome);
 
 // Libera toda a lista
 void libera_lista(List *lista);

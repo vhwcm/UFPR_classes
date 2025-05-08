@@ -5,21 +5,25 @@
 #include <time.h>   // For ctime
 
 // Implementation of criar_metadados
-metadados* criar_metadados(const char *filename) {
-    metadados *meta = (metadados*)malloc(sizeof(metadados));
-    if (!meta) {
+metadados *criar_metadados(const char *filename)
+{
+    metadados *meta = (metadados *)malloc(sizeof(metadados));
+    if (!meta)
+    {
         perror("Failed to allocate memory for metadados");
         return NULL;
     }
     FILE *fp = fopen(filename, "rb");
-    if (fp == NULL) {
+    if (fp == NULL)
+    {
         perror("Error opening file");
         // Handle error, maybe return an error code or NULL
         return NULL; // Or appropriate error handling
     }
 
     int fd = fileno(fp); // Get the file descriptor from the FILE stream
-    if (fd == -1) {
+    if (fd == -1)
+    {
         perror("Error getting file descriptor");
         fclose(fp); // Close the file stream
         // Handle error
@@ -30,67 +34,85 @@ metadados* criar_metadados(const char *filename) {
                            // fstat needs the address of an existing struct to fill.
 
     // Pass the address of file_info to fstat
-    if (fstat(fd, &file_info) == -1) {
+    if (fstat(fd, &file_info) == -1)
+    {
         perror("Error getting file stats");
         fclose(fp); // Close the file stream
         // Handle error
         return NULL;
     }
-    snprintf(meta->nome, TAM_MAX_FILENAME + 1, "%.*s", TAM_MAX_FILENAME, filename);    // Now you can access the members of file_info:
-    meta->nome[20] = '\0';
+    snprintf(meta->nome, TAM_MAX_FILENAME + 1, "%.*s", TAM_MAX_FILENAME, filename); // Now you can access the members of file_info:
+    meta->nome[TAM_MAX_FILENAME] = '\0';
     printf("meta->nome = %s\n", meta->nome);
-    meta->o_size = file_info.st_size;       // File size in bytes
+    meta->uid = file_info.st_uid;
+    meta->o_size = file_info.st_size; // File size in bytes
     meta->c_size = meta->o_size;
-    meta->u_acesso = file_info.st_atime;    // Time of last access
-    meta->u_mod = file_info.st_mtime;       // Time of last modification
+    meta->u_mod = file_info.st_mtime; // Time of last modification
     meta->perm = file_info.st_mode & 0777;
     meta->pos = 0;
+    meta->local = 0;
     // Remember to close the file stream when done
     fclose(fp);
 
     return meta;
 }
 
-metadados* dump_metadados(const char *filename, unsigned int o_size, unsigned int c_size, unsigned int pos,  time_t u_acesso, time_t u_mod, mode_t perm) {
-    metadados *meta = (metadados*)malloc(sizeof(metadados));
-    if (!meta) {
-        perror("Failed to allocate memory for metadados");
+metadados *dump_metadados(const char *filename, uid_t uid, unsigned int o_size, unsigned int c_size,
+                          time_t u_mod, mode_t perm, unsigned int pos, unsigned int local)
+{
+
+    metadados *meta = (metadados *)malloc(sizeof(metadados));
+    if (!meta)
+    {
+        perror("Failed to allocate memory for metadados in dump_metadados");
         return NULL;
     }
-    strcpy(meta->nome, filename);
-    meta->o_size = o_size;       // File size in bytes
+
+    // Copy filename, ensuring truncation and null termination
+    snprintf(meta->nome, sizeof(meta->nome), "%.*s", TAM_MAX_FILENAME, filename);
+    // snprintf handles null termination if space (sizeof(meta->nome)) allows.
+    // "%.*s" with TAM_MAX_FILENAME ensures at most TAM_MAX_FILENAME chars are written from filename.
+
+    meta->uid = uid;
+    meta->o_size = o_size;
     meta->c_size = c_size;
+    meta->u_mod = u_mod;
+    meta->perm = perm & 0777; // Apply mask to ensure only permission bits are stored
     meta->pos = pos;
-    meta->u_acesso = u_acesso;    // Time of last access
-    meta->u_mod = u_mod;       // Time of last modification
-    meta->perm = perm & 0777;
+    meta->local = local;
 
     return meta;
 }
 
 // Implementation of free_metadados
-void free_metadados(metadados *meta) {
-    if (meta) {
-        free(meta->nome); 
+void free_metadados(metadados *meta)
+{
+    if (meta)
+    {
         free(meta);
     }
 }
 
-
-void inicializa_lista(List *lista) {
+void inicializa_lista(List *lista)
+{
     lista->primeiro = NULL;
     lista->ultimo = NULL;
     lista->tamanho = 0;
 }
 
-int insere_lista(List *lista, metadados *data) {
-    ListNode *novo = (ListNode*)malloc(sizeof(ListNode));
-    if (!novo) return -1;
+int insere_lista(List *lista, metadados *data)
+{
+    ListNode *novo = (ListNode *)malloc(sizeof(ListNode));
+    if (!novo)
+        return -1;
     novo->data = data;
     novo->next = NULL;
-    if (lista->ultimo) {
+    if (lista->ultimo)
+    {
         lista->ultimo->next = novo;
-    } else {
+    }
+    else
+    {
         lista->primeiro = novo;
     }
     lista->ultimo = novo;
@@ -98,16 +120,23 @@ int insere_lista(List *lista, metadados *data) {
     return 0;
 }
 
-int remove_lista(List *lista, const char *nome) {
+int remove_lista(List *lista, const char *nome)
+{
     ListNode *atual = lista->primeiro, *anterior = NULL;
-    while (atual) {
-        if (atual->data && atual->data->nome && strcmp(atual->data->nome, nome) == 0) {
-            if (anterior) {
+    while (atual)
+    {
+        if (atual->data && atual->data->nome && strcmp(atual->data->nome, nome) == 0)
+        {
+            if (anterior)
+            {
                 anterior->next = atual->next;
-            } else {
+            }
+            else
+            {
                 lista->primeiro = atual->next;
             }
-            if (atual == lista->ultimo) {
+            if (atual == lista->ultimo)
+            {
                 lista->ultimo = anterior;
             }
             free_metadados(atual->data);
@@ -121,10 +150,13 @@ int remove_lista(List *lista, const char *nome) {
     return -1;
 }
 
-ListNode* busca_lista(List *lista, const char *nome) {
+ListNode *busca_lista(List *lista, const char *nome)
+{
     ListNode *atual = lista->primeiro;
-    while (atual) {
-        if (atual->data && atual->data->nome && strcmp(atual->data->nome, nome) == 0) {
+    while (atual)
+    {
+        if (atual->data && atual->data->nome && strcmp(atual->data->nome, nome) == 0)
+        {
             return atual;
         }
         atual = atual->next;
@@ -132,9 +164,11 @@ ListNode* busca_lista(List *lista, const char *nome) {
     return NULL;
 }
 
-void libera_lista(List *lista) {
+void libera_lista(List *lista)
+{
     ListNode *atual = lista->primeiro;
-    while (atual) {
+    while (atual)
+    {
         ListNode *prox = atual->next;
         free_metadados(atual->data);
         free(atual);
@@ -145,27 +179,28 @@ void libera_lista(List *lista) {
     lista->tamanho = 0;
 }
 
-void imprime_lista(List *lista) {
+void imprime_lista(List *lista)
+{
     ListNode *atual = lista->primeiro;
     printf("--- Lista de Metadados ---\n");
-    while (atual) {
-        if (atual->data) {
-            printf("  Nome: %s\n", atual->data->nome ? atual->data->nome : "(null)");
-            printf("  Tamanho: %u bytes\n", atual->data->o_size);
-            printf("  Posição: %u\n", atual->data->pos);
-            char time_buf[30];
-            struct tm *tm_info;
-            tm_info = localtime(&atual->data->u_acesso);
-            if (tm_info && strftime(time_buf, sizeof(time_buf), "%c", tm_info))
-                printf("  Último Acesso: %s\n", time_buf);
-            else
-                printf("  Último Acesso: (invalid time)\n");
-            tm_info = localtime(&atual->data->u_mod);
+    while (atual)
+    {
+        if (atual->data)
+        {
+            metadados *m = atual->data;
+            printf("  Nome: %s\n", m->nome);
+            printf("  UID: %u\n", (unsigned int)m->uid);
+            printf("  Tamanho Original: %u bytes\n", m->o_size);
+            printf("  Tamanho Comprimido: %u bytes\n", m->c_size);
+            printf("  Posição: %u\n", m->pos);
+            printf("  Local: %u\n", m->local);
+            char time_buf[64];
+            struct tm *tm_info = localtime(&m->u_mod);
             if (tm_info && strftime(time_buf, sizeof(time_buf), "%c", tm_info))
                 printf("  Última Modificação: %s\n", time_buf);
             else
                 printf("  Última Modificação: (invalid time)\n");
-            printf("  Permissões: %o\n", atual->data->perm);
+            printf("  Permissões: %o\n", m->perm);
             printf("  ----\n");
         }
         atual = atual->next;
@@ -173,83 +208,164 @@ void imprime_lista(List *lista) {
     printf("--- Fim da Lista ---\n");
 }
 
-int escreve_metadados_arquivo(FILE *arquivo, List *lista) {
-    if (!arquivo || !lista) return -1;
-
-    ListNode *atual = lista->primeiro;
-    unsigned int tamm ;
-    while (atual) {
-        if (atual->data) {
-            metadados *meta = atual->data;
-
-            if (fwrite(meta->nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != TAM_MAX_FILENAME) return -1;  
-             tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever nome\n", tamm);
-            if (fwrite(&meta->o_size, sizeof(unsigned int), 1, arquivo) != 1) return -1;
-              tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever o_size\n", tamm);
-            if (fwrite(&meta->c_size, sizeof(unsigned int), 1, arquivo) != 1) return -1;
-            tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever u_size\n", tamm);
-            if (fwrite(&meta->pos, sizeof(unsigned int), 1, arquivo) != 1) return -1;
-              tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever pos\n", tamm);
-            if (fwrite(&meta->u_acesso, sizeof(time_t), 1, arquivo) != 1) return -1;
-              tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever u_acess\n", tamm);
-            if (fwrite(&meta->u_mod, sizeof(time_t), 1, arquivo) != 1) return -1;
-              tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever u_mod\n", tamm);
-            if (fwrite(&meta->perm, sizeof(mode_t), 1, arquivo) != 1) return -1;
-              tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever perm\n", tamm);
-        }
-        atual = atual->next;
+int escreve_metadados_arquivo(FILE *arquivo, List *dir)
+{
+    if (arquivo == NULL || dir == NULL)
+    {
+        fprintf(stderr, "Erro: Ponteiro de arquivo ou diretório nulo em escreve_metadados_arquivo.\n");
+        return -1;
     }
-    fwrite(&lista->tamanho ,sizeof(int),1,arquivo);
-    tamm = ftell(arquivo);
-            printf("\npos %d tam bytes, apos escrever tamanho\n", tamm);    
-    return 0; // Sucesso
-}
 
-int le_metadados_arquivo(FILE *arquivo, List *lista, unsigned int tam) {
-    if (!arquivo || !lista) return -1;
-    unsigned int metadado_id = 0;
-    int posic = ftell(arquivo);
-    printf("\nposic: %d\n", posic);
-    while (metadado_id < tam) {        // Tenta ler o tamanho do nome
-        char nome[21];
-        if (fread(nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != TAM_METADADOS) {
-            nome[20] = '\0';
-        } else {
+    ListNode *atual = dir->primeiro;
+    int i;
+
+    // Write each metadata entry
+    for (i = 0; i < dir->tamanho; i++)
+    {
+        if (atual == NULL || atual->data == NULL)
+        {
+            fprintf(stderr, "Erro: Nó ou dados do nó nulos ao escrever metadados (entrada %d).\n", i);
+            return -1; // Error in list structure
+        }
+        metadados *meta = atual->data;
+
+        // Write nome (fixed size TAM_MAX_FILENAME + 1, but only TAM_MAX_FILENAME useful chars + null)
+        if (fwrite(meta->nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != (TAM_MAX_FILENAME))
+        {
+            perror("Erro ao escrever nome do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->uid, sizeof(uid_t), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever UID do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->o_size, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever tamanho original do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->c_size, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever tamanho comprimido do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->u_mod, sizeof(time_t), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever tempo de modificação do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->perm, sizeof(mode_t), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever permissões do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->pos, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever posição do metadado");
+            return -1;
+        }
+        if (fwrite(&meta->local, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao escrever 'local' do metadado");
             return -1;
         }
 
-        unsigned int o_size, c_size, pos;
-        time_t u_acesso, u_mod;
-        mode_t perm;
-
-        // Lê os outros campos
-        fread(&o_size, sizeof(unsigned int), 1, arquivo);
-        fread(&c_size, sizeof(unsigned int), 1, arquivo);
-        fread(&pos, sizeof(unsigned int), 1, arquivo);
-        fread(&u_acesso, sizeof(time_t), 1, arquivo);
-        fread(&u_mod, sizeof(time_t), 1, arquivo);
-        fread(&perm, sizeof(mode_t), 1, arquivo);
-
-        // Cria o metadados (criar_metadados faz strdup do nome)
-        metadados *novo_meta = dump_metadados(nome, o_size, c_size, pos, u_acesso, u_mod, perm);
-
-        if (!novo_meta) return -1; // Erro na criação do metadados
-
-        // Insere na lista
-        if (insere_lista(lista, novo_meta) != 0) {
-            free_metadados(novo_meta); // Libera metadados se a inserção falhar
-            return -1; // Erro na inserção
-        }
-        metadado_id++;
+        atual = atual->next;
     }
 
-    return 0; // Sucesso
+    int num_entradas = dir->tamanho;
+    if (fwrite(&num_entradas, sizeof(int), 1, arquivo) != 1)
+    {
+        perror("Erro ao escrever o tamanho do diretório (número de entradas)");
+        return -1;
+    }
+
+    printf("Diretório escrito com %d entradas.\n", num_entradas);
+    return 0; // Success
 }
 
+int le_metadados_arquivo(FILE *arquivo, List *dir, unsigned int tam_dir)
+{
+    if (arquivo == NULL || dir == NULL)
+    {
+        fprintf(stderr, "Erro: Ponteiro de arquivo ou diretório nulo em le_metadados_arquivo.\n");
+        return -1;
+    }
+    if (tam_dir <= 0)
+    {
+        printf("Nenhum metadado para ler (tam_dir = %d).\n", tam_dir);
+        return 0; // Not an error, just nothing to read
+    }
+
+    int i;
+    for (i = 0; i < tam_dir; i++)
+    {
+        metadados *meta_lido = (metadados *)malloc(sizeof(metadados));
+        if (!meta_lido)
+        {
+            perror("Falha ao alocar memória para metadado lido");
+            return -1; // Allocation error
+        }
+
+        // Read nome (TAM_MAX_FILENAME + 1 bytes)
+        if (fread(meta_lido->nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != (TAM_MAX_FILENAME))
+        {
+            perror("Erro ao ler nome do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        // Ensure null termination, though fwrite wrote TAM_MAX_FILENAME + 1 bytes,
+        // the last one should be the null char if snprintf worked correctly before writing.
+        // However, if the file was corrupted or written differently, this is a safeguard.
+        meta_lido->nome[TAM_MAX_FILENAME] = '\0';
+
+        if (fread(&meta_lido->uid, sizeof(uid_t), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler UID do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        if (fread(&meta_lido->o_size, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler tamanho original do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        if (fread(&meta_lido->c_size, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler tamanho comprimido do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        if (fread(&meta_lido->u_mod, sizeof(time_t), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler tempo de modificação do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        if (fread(&meta_lido->perm, sizeof(mode_t), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler permissões do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        if (fread(&meta_lido->pos, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler posição do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        if (fread(&meta_lido->local, sizeof(unsigned int), 1, arquivo) != 1)
+        {
+            perror("Erro ao ler 'local' do metadado");
+            free(meta_lido);
+            return -1;
+        }
+        // u_acesso was removed from the struct, so no fread for it.
+
+        insere_lista(dir, meta_lido); // Add the read metadata to the list
+    }
+    printf("%d entradas de metadados lidas e adicionadas à lista.\n", tam_dir);
+    return 0; // Success
+}

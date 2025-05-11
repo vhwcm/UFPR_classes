@@ -55,7 +55,7 @@ metadados *criar_metadados(const char *filename);
 metadados *dump_metadados(const char *filename, uid_t uid, unsigned int o_size, unsigned int c_size,
                           time_t u_mod, mode_t perm, unsigned int pos, unsigned int local);
 
-                          
+
 void free_metadados(metadados *meta);
 
 // Insere no final da lista
@@ -74,6 +74,9 @@ void libera_lista(Lista *lista);
 
 // Imprime a lista
 void imprime_lista(Lista *lista);
+
+// Imprime todos os metadados de uma struct metadados
+void imprime_metadados(metadados *meta);
 
 int escreve_metadados_arquivo(FILE *arquivo, Lista *lista);
 

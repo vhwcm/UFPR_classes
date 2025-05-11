@@ -21,6 +21,8 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
 int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
+int listar_conteudo(FILE *arquivo, Lista *diretorio);
+
 
 int main(int argc, char *argv[])
 {
@@ -132,20 +134,21 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(opcao, "-r") == 0)
         {
-            arquivo = fopen(argv[argumento_atual], "rb+");
-            if (!arquivo)
+            escreve = 1;
+            /* Loop para remover os membros até o fim */
+            while (argumento_atual < argc)
             {
-                arquivo = fopen("arquivo.vc", "wb+");
-                if (!arquivo)
+                if (remover(argv[argumento_atual], arquivo, diretorio) != 0)
                 {
-                    perror("Não foi possível abrir/criar arquivo.vc");
-                    return 1;
+                    fprintf(stderr, "Falha ao processar a opção -r para %s\n", argv[argumento_atual]);
                 }
+                argumento_atual++;
             }
+            imprime_lista(diretorio);
         } 
         else if (strcmp(opcao,"-c") == 0)
         {
-            imprime_lista(diretorio);
+            listar_conteudo(arquivo, diretorio);
         }
         else
         {
@@ -156,10 +159,20 @@ int main(int argc, char *argv[])
     /* Depois de escrever todos os membros, escreve o diretório*/
     if (escreve)
     {
-        fseek(arquivo, diretorio->ultimo->data->local + diretorio->ultimo->data->c_size,SEEK_SET);
-        if(escreve_metadados_arquivo(arquivo, diretorio))
+        long pos = 0;
+        /* Se diretório vázil*/
+        if (diretorio->ultimo)
+            pos = diretorio->ultimo->data->local + diretorio->ultimo->data->c_size;
+        
+            fseek(arquivo, pos, SEEK_SET);
+            if(escreve_metadados_arquivo(arquivo, diretorio))
             fprintf(stderr, "Erro ao escrever metadados");
+
+        int fd = fileno(arquivo);
+        ftruncate(fd,ftell(arquivo));
     }
+
+
     
     printf("Finalizando...\n");
     
@@ -612,6 +625,133 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
     }else{
         membro->prox = no_target->prox;
         no_target->prox = membro;
+    }
+    return 0;
+}
+
+int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
+    // Localiza o nó do arquivo a ser removido
+    No* membro = busca_lista(diretorio, nome_arquivo);
+    if (!membro) {
+        printf("\nNão foi possível encontrar o arquivo: %s\n", nome_arquivo);
+        return -1;
+    }
+    
+    int pos_remover = membro->data->pos;
+    int tam_remover = membro->data->c_size;
+    long local_remover = membro->data->local;
+    
+    printf("Removendo arquivo %s (tamanho %d) da posição %d (offset %ld)\n", 
+           nome_arquivo, tam_remover, pos_remover, local_remover);
+    
+    // Criar vetor auxiliar para acessar os nós por posição
+    int tam_dir = diretorio->tamanho;
+    int tam_max = 0;
+    No* vetor[tam_dir];
+    No* aux = diretorio->primeiro;
+    while (aux != NULL) {
+        vetor[aux->data->pos] = aux;
+        if (aux->data->c_size > tam_max)
+            tam_max = aux->data->c_size;
+        aux = aux->prox;
+    }
+    
+    char buffer[tam_max];
+    
+    // Deslocar todos os arquivos que vêm depois do removido para frente
+    for (int i = pos_remover + 1; i < tam_dir; i++) {
+        aux = vetor[i];
+        
+        // Atualiza a posição
+        aux->data->pos--;
+        
+        // Lê os dados do arquivo
+        fseek(arquivo, aux->data->local, SEEK_SET);
+        if (fread(buffer, 1, aux->data->c_size, arquivo) != aux->data->c_size) {
+            perror("Erro ao ler arquivo durante remoção");
+            return -1;
+        }
+        
+        // Calcula a nova localização (diminuindo o tamanho do arquivo removido)
+        long nova_local = aux->data->local - tam_remover;
+        aux->data->local = nova_local;
+        
+        // Escreve os dados na nova posição
+        fseek(arquivo, nova_local, SEEK_SET);
+        if (fwrite(buffer, 1, aux->data->c_size, arquivo) != aux->data->c_size) {
+            perror("Erro ao escrever arquivo durante remoção");
+            return -1;
+        }
+    }
+    
+    // Ajustar os ponteiros da lista encadeada
+    No* anterior = NULL;
+    aux = diretorio->primeiro;
+    
+    // Encontrar o nó anterior ao removido
+    while (aux != membro && aux != NULL) {
+        anterior = aux;
+        aux = aux->prox;
+    }
+    
+    // Ajusta os ponteiros
+    if (anterior) {
+        anterior->prox = membro->prox;
+    } else {
+        // Se o removido era o primeiro
+        diretorio->primeiro = membro->prox;
+    }
+    
+    // Se o removido era o último
+    if (diretorio->ultimo == membro) {
+        diretorio->ultimo = anterior;
+    }
+    
+    // Libera a memória do nó removido
+    free_metadados(membro->data);
+    free(membro);
+    
+    // Atualiza o tamanho do diretório
+    diretorio->tamanho--;
+    
+    printf("Arquivo %s removido com sucesso.\n", nome_arquivo);
+    return 0;
+}
+
+int listar_conteudo(FILE *arquivo, Lista *diretorio) {
+    if(!diretorio || !arquivo){
+        printf("erro!!");
+        return -1;
+    }
+    printf("\n==Mostrando conteudo do arquivo.vc==\n\n");
+    No* aux = diretorio->primeiro;
+    int tamanho = diretorio->tamanho;
+    int o_size;
+    int local = 0;
+    for(int i = 0; i < tamanho; i++){
+        local = aux->data->local;
+        int tam = aux->data->c_size;
+        char buffer[tam];
+        printf("=Metadados=\n");
+        imprime_metadados(aux->data);
+        fseek(arquivo,local,SEEK_SET);
+        fread(buffer,1,tam,arquivo);
+        if(tam != aux->data->o_size){
+          o_size = aux->data->o_size; 
+          char buffer_out[o_size];
+          LZ_Uncompress(buffer,buffer_out,o_size); 
+          printf("\n=Conteudo=\n");
+          for(int i = 0; i < o_size; i++){
+            printf("%c",buffer_out[i]);
+          }
+        }else{
+            printf("\n=Conteudo=\n");
+            for(int i = 0; i < tam; i++){
+                printf("%c",buffer[i]);
+            }
+        }
+        printf("\n\n");
+        aux = aux->prox;
     }
     return 0;
 }

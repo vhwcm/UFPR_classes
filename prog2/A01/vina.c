@@ -169,6 +169,30 @@ void libera_lista(Lista *lista)
     lista->tamanho = 0;
 }
 
+void imprime_metadados(metadados *m)
+{
+    if (!m) {
+        printf("Erro: Metadados nulos.\n");
+        return;
+    }
+    
+    printf("  Nome: %s\n", m->nome);
+    printf("  UID: %u\n", (unsigned int)m->uid);
+    printf("  Tamanho Original: %u bytes\n", m->o_size);
+    printf("  Tamanho Comprimido: %u bytes\n", m->c_size);
+    printf("  Posição: %u\n", m->pos);
+    printf("  Local: %u\n", m->local);
+    
+    char time_buf[64];
+    struct tm *tm_info = localtime(&m->u_mod);
+    if (tm_info && strftime(time_buf, sizeof(time_buf), "%c", tm_info))
+        printf("  Última Modificação: %s\n", time_buf);
+    else
+        printf("  Última Modificação: (data inválida)\n");
+        
+    printf("  Permissões: %o\n", m->perm);
+}
+
 void imprime_lista(Lista *lista)
 {
     No *atual = lista->primeiro;
@@ -177,20 +201,7 @@ void imprime_lista(Lista *lista)
     {
         if (atual->data)
         {
-            metadados *m = atual->data;
-            printf("  Nome: %s\n", m->nome);
-            printf("  UID: %u\n", (unsigned int)m->uid);
-            printf("  Tamanho Original: %u bytes\n", m->o_size);
-            printf("  Tamanho Comprimido: %u bytes\n", m->c_size);
-            printf("  Posição: %u\n", m->pos);
-            printf("  Local: %u\n", m->local);
-            char time_buf[64];
-            struct tm *tm_info = localtime(&m->u_mod);
-            if (tm_info && strftime(time_buf, sizeof(time_buf), "%c", tm_info))
-                printf("  Última Modificação: %s\n", time_buf);
-            else
-                printf("  Última Modificação: (invalid time)\n");
-            printf("  Permissões: %o\n", m->perm);
+            imprime_metadados(atual->data);
             printf("  ----\n");
         }
         atual = atual->prox;

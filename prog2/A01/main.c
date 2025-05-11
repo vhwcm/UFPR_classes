@@ -9,11 +9,13 @@
 #include "lz.h"
 #include "vina.h"
 
+int ler_diretorio_arquivo(FILE *arquivo, Lista *diretorio);
+
 int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
 int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
-int ler_diretorio_arquivo(FILE *arquivo, Lista *diretorio);
+int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *diretorio);
 
 int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
@@ -22,8 +24,8 @@ int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
 int main(int argc, char *argv[])
 {
-    printf("\ntamanho do TAM_METADADOS_NO_DISCO:%ld\n", TAM_METADADOS_NO_DISCO);
-    if (argc < 4) /* Verifica se o número de argumentos está correto*/
+
+    if (argc < 3) /* Verifica se o número de argumentos está correto*/
     {
         printf("Formato Incorreto!\nUtilize: ./vina -[arg] [arquivo] [arquivo1...arquivoN]\n");
         return -1;
@@ -40,16 +42,15 @@ int main(int argc, char *argv[])
     if (!diretorio)
     return 2;
     
-    int escreve = 1;
+    int escreve = 0;
     if(strcmp(opcao,"-m") == 0){
-        if (argc < 5) {
-            printf("Formato Incorreto!\nUtilize: ./vina -m [membro target] [arquivo] [arquivo1...arquivoN]\n");
+        if (argc != 5) {
+            printf("Formato Incorreto!\nUtilize: ./vina -m [membro] [arquivo] [membro target]\n");
             return -1;
-        }
-
-        /* Trata opção -m */
-    
-    } else { /* Trata as outras opções */
+        } else {
+            argumento_atual++;
+        }    
+    }
         /* Abre o arquivo existente ou cria um novo */
         arquivo = fopen(argv[argumento_atual], "rb+");
         if (!arquivo)
@@ -85,6 +86,7 @@ int main(int argc, char *argv[])
             /* Loop para inserir os membros até o fim */
             while (argumento_atual < argc)
             {
+                escreve = 1;
                 if (inserir_p(argv[argumento_atual], arquivo, diretorio) != 0)
                 {
                     fprintf(stderr, "Falha ao processar a opção -ip para %s\n", argv[argumento_atual]);
@@ -98,6 +100,7 @@ int main(int argc, char *argv[])
             /* Loop para inserir os membros até o fim */
             while (argumento_atual < argc)
             {
+                escreve = 1;
                 if (inserir_c(argv[argumento_atual], arquivo, diretorio) != 0)
                 {
                     fprintf(stderr, "Falha ao processar a opção -ic para %s\n", argv[argumento_atual]);
@@ -105,11 +108,17 @@ int main(int argc, char *argv[])
                 argumento_atual++;
             }
             imprime_lista(diretorio);
-        } 
-
+        }
+        else if (strcmp(opcao, "-m") == 0) 
+        {
+            if (mover(argv[2],argv[4],arquivo,diretorio) != 0){
+                fprintf(stderr, "Falha ao processar a opção -ic para %s e %s\n", argv[2], argv[4]);
+                return -1;
+            }
+            imprime_lista(diretorio);
+        }
         else if (strcmp(opcao, "-x") == 0) 
         {
-            escreve = 0; /* Porque essa opção não mexe no diretório */
            /* Loop para inserir os membros até o fim */
            while (argumento_atual < argc)
            {
@@ -132,18 +141,23 @@ int main(int argc, char *argv[])
                     return 1;
                 }
             }
+        } 
+        else if (strcmp(opcao,"-c") == 0)
+        {
+            imprime_lista(diretorio);
         }
         else
         {
             printf("Argumento incorreto!!\n");
             return -2;
         }
-    }
 
     /* Depois de escrever todos os membros, escreve o diretório*/
-    if (escreve && escreve_metadados_arquivo(arquivo, diretorio))
+    if (escreve)
     {
-        fprintf(stderr, "Erro ao escrever metadados");
+        fseek(arquivo, diretorio->ultimo->data->local + diretorio->ultimo->data->c_size,SEEK_SET);
+        if(escreve_metadados_arquivo(arquivo, diretorio))
+            fprintf(stderr, "Erro ao escrever metadados");
     }
     
     printf("Finalizando...\n");
@@ -465,5 +479,137 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
     }
     
     fclose(fp);
+    return 0;
+}
+
+
+int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *diretorio) {
+    No* membro = busca_lista(diretorio,nome_arquivo);
+    if (!membro) {
+        printf("\nNao foi o possivel encontrar o arquivo: %s\n", nome_arquivo);
+        return -1;
+    }
+
+    unsigned int local_fim_t = 0;
+    unsigned int pos_target = 0;
+    No* no_target;
+    if(strcmp(target,"NULL") != 0){
+        no_target = busca_lista(diretorio,target);
+        if (!no_target) {
+            printf("\nNao foi o possivel encontrar o arquivo: %s\n", target);
+            return -1;
+        }
+
+        local_fim_t = no_target->data->local + no_target->data->c_size;
+        pos_target = no_target->data->pos;
+    }
+
+    if (pos_target == membro->data->pos){
+        printf("\nNada precisa ser feito...\n");
+        return 0;
+    }
+    unsigned int m_size = membro->data->c_size;
+    char m_buffer[m_size];
+    fseek(arquivo,membro->data->local ,SEEK_SET);
+    fread(m_buffer,1,m_size,arquivo);
+
+    unsigned int tam_dir = diretorio->tamanho;
+    unsigned int tam_max = 0;
+    No* vetor[tam_dir];
+    No* aux = diretorio->primeiro;
+    /* O vetor e preenchido com os ponteiros da lista*/
+    /* Vai ser util porque minha lista não é duplamente encadeada*/
+    while (aux != NULL)
+    {
+        vetor[aux->data->pos] = aux;
+        if(aux->data->c_size > tam_max)
+            tam_max = aux->data->c_size;
+        aux = aux->prox;
+    }
+
+    char aux_buffer[tam_max];
+    unsigned int pos_atual = membro->data->pos;
+    aux = membro;
+
+    /* Caso que deve ser deslocado para frente*/
+    if(pos_target > membro->data->pos){
+        /* Itera sobre todos os membros entre o membro e o target-inclusive */
+        for (unsigned int i = pos_atual; i < pos_target; i++){
+            
+            /*Le o dado do próximo arquivo*/
+            aux = aux->prox;
+            aux->data->pos -= 1;
+            fseek(arquivo, aux->data->local,SEEK_SET);
+            fread(aux_buffer, 1, aux->data->c_size,arquivo);
+            fseek(arquivo, aux->data->local,SEEK_SET);
+            fseek(arquivo, -m_size,SEEK_CUR);
+            unsigned int n_local = ftell(arquivo);
+            aux->data->local = n_local;
+            fwrite(aux_buffer,1,aux->data->c_size,arquivo);
+        }
+        if(diretorio->ultimo == no_target){
+            diretorio->ultimo = membro;
+        } 
+        if(diretorio->primeiro == membro){
+            diretorio->primeiro = membro->prox; 
+        }
+    } else { /* Caso que deve ser deslocado para trás */
+        /* Move o ponteiro para o fim do membro que será deslocado*/
+        for (unsigned int i = pos_atual; i > pos_target + 1; i--){
+            /* Lê o membro anterior*/
+            aux = vetor[i - 1];
+            aux->data->pos -= 1;
+            fseek(arquivo, aux->data->local, SEEK_SET);
+            fread(aux_buffer, 1, aux->data->c_size,arquivo);
+
+            /* Faz o shift rigth no tamanho do membro*/
+            fseek(arquivo, aux->data->local, SEEK_SET);
+            fseek(arquivo, m_size, SEEK_CUR);
+            unsigned int n_local = ftell(arquivo);
+            aux->data->local = n_local;
+            fwrite(aux_buffer,1,aux->data->c_size,arquivo);
+        }
+
+        /* Se for NULL, vai faltar mexer o primeiro elemento*/
+        if(strcmp(target,"NULL") == 0){
+            aux = vetor[pos_target];
+            fseek(arquivo, 0, SEEK_SET);
+            fread(aux_buffer, 1, aux->data->c_size,arquivo);
+            fseek(arquivo, 0, SEEK_SET);
+            fseek(arquivo, m_size, SEEK_CUR);
+            unsigned int n_local = ftell(arquivo);
+            aux->data->local = n_local;
+            fwrite(aux_buffer,1,aux->data->c_size,arquivo);
+            fseek(arquivo,0,SEEK_SET);
+            diretorio->primeiro = membro;
+        }else{
+            aux = vetor[pos_target];
+            fseek(arquivo, aux->data->local + aux->data->c_size, SEEK_SET);
+        }
+
+        if(diretorio->ultimo == membro){
+            diretorio->ultimo = vetor[membro->data->pos-1];
+        }
+        /* Escreve o membro que se moveu*/
+    }
+    unsigned int n_local = ftell(arquivo);
+    membro->data->local = n_local;
+    fwrite(m_buffer, 1, m_size, arquivo);
+
+    /* Corrige diretorio*/
+    No* temp;
+    if(membro->data->pos != 0){
+        temp = vetor[membro->data->pos - 1];
+        temp->prox = membro->prox;    
+    }
+    if(strcmp(target,"NULL") == 0){
+        membro->prox = vetor[0];    
+        membro->data->pos = 0;
+        membro->data->local = 0;
+    }else{
+        membro->prox = no_target->prox;
+        no_target->prox = membro;
+        membro->data->pos = pos_target + 1;
+    }
     return 0;
 }

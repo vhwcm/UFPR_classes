@@ -1,13 +1,11 @@
 #include "vina.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> // For strcmp and strdup
-#include <time.h>   // For ctime
+#include <string.h> 
+#include <time.h>   
 
-// Implementation of criar_metadados
 metadados *criar_metadados(const char *filename)
 {
-    /* Aloca o metadado novo */
     metadados *meta = (metadados *)malloc(sizeof(metadados));
     if (!meta)
     {
@@ -18,41 +16,35 @@ metadados *criar_metadados(const char *filename)
     if (fp == NULL)
     {
         perror("Error opening file");
-        // Handle error, maybe return an error code or NULL
-        return NULL; // Or appropriate error handling
+        return NULL;
     }
 
-    int fd = fileno(fp); // Get the file descriptor from the FILE stream
+    int fd = fileno(fp); 
     if (fd == -1)
     {
         perror("Error getting file descriptor");
-        fclose(fp); // Close the file stream
-        // Handle error
+        fclose(fp); 
         return NULL;
     }
 
-    struct stat file_info; // Declare the struct stat variable itself, not a pointer
-                           // fstat needs the address of an existing struct to fill.
+    struct stat file_info; 
 
-    // Pass the address of file_info to fstat
     if (fstat(fd, &file_info) == -1)
     {
         perror("Error getting file stats");
-        fclose(fp); // Close the file stream
-        // Handle error
+        fclose(fp); 
         return NULL;
     }
-    snprintf(meta->nome, TAM_MAX_FILENAME + 1, "%.*s", TAM_MAX_FILENAME, filename); // Now you can access the members of file_info:
+    snprintf(meta->nome, TAM_MAX_FILENAME + 1, "%.*s", TAM_MAX_FILENAME, filename); 
     meta->nome[TAM_MAX_FILENAME] = '\0';
     printf("meta->nome = %s\n", meta->nome);
     meta->uid = file_info.st_uid;
-    meta->o_size = file_info.st_size; // File size in bytes
+    meta->o_size = file_info.st_size;
     meta->c_size = meta->o_size;
-    meta->u_mod = file_info.st_mtime; // Time of last modification
+    meta->u_mod = file_info.st_mtime; 
     meta->perm = file_info.st_mode & 0777;
     meta->pos = 0;
     meta->local = 0;
-    // Remember to close the file stream when done
     fclose(fp);
 
     return meta;
@@ -69,23 +61,20 @@ metadados *dump_metadados(const char *filename, uid_t uid, unsigned int o_size, 
         return NULL;
     }
 
-    // Copy filename, ensuring truncation and null termination
+
     snprintf(meta->nome, sizeof(meta->nome), "%.*s", TAM_MAX_FILENAME, filename);
-    // snprintf handles null termination if space (sizeof(meta->nome)) allows.
-    // "%.*s" with TAM_MAX_FILENAME ensures at most TAM_MAX_FILENAME chars are written from filename.
 
     meta->uid = uid;
     meta->o_size = o_size;
     meta->c_size = c_size;
     meta->u_mod = u_mod;
-    meta->perm = perm & 0777; // Apply mask to ensure only permission bits are stored
+    meta->perm = perm & 0777;
     meta->pos = pos;
     meta->local = local;
 
     return meta;
 }
 
-// Implementation of free_metadados
 void free_metadados(metadados *meta)
 {
     if (meta)
@@ -103,7 +92,6 @@ void inicializa_lista(Lista *lista)
 
 int insere_lista(Lista *lista, metadados *data)
 {
-    /* Aloca um novo no */
     No *novo = (No *)malloc(sizeof(No));
     if (!novo)
         return -1;
@@ -221,17 +209,15 @@ int escreve_metadados_arquivo(FILE *arquivo, Lista *dir)
     No *atual = dir->primeiro;
     int i;
 
-    // Write each metadata entry
     for (i = 0; i < dir->tamanho; i++)
     {
         if (atual == NULL || atual->data == NULL)
         {
             fprintf(stderr, "Erro: Nó ou dados do nó nulos ao escrever metadados (entrada %d).\n", i);
-            return -1; // Error in Lista structure
+            return -1; 
         }
         metadados *meta = atual->data;
 
-        // Write nome (fixed size TAM_MAX_FILENAME + 1, but only TAM_MAX_FILENAME useful chars + null)
         if (fwrite(meta->nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != (TAM_MAX_FILENAME))
         {
             perror("Erro ao escrever nome do metadado");
@@ -284,7 +270,7 @@ int escreve_metadados_arquivo(FILE *arquivo, Lista *dir)
     }
 
     printf("Diretório escrito com %d entradas.\n", num_entradas);
-    return 0; // Success
+    return 0;
 }
 
 int le_metadados_arquivo(FILE *arquivo, Lista *dir, unsigned int tam_dir)
@@ -297,7 +283,7 @@ int le_metadados_arquivo(FILE *arquivo, Lista *dir, unsigned int tam_dir)
     if (tam_dir <= 0)
     {
         printf("Nenhum metadado para ler (tam_dir = %d).\n", tam_dir);
-        return 0; // Not an error, just nothing to read
+        return 0;
     }
 
     int i;
@@ -307,19 +293,17 @@ int le_metadados_arquivo(FILE *arquivo, Lista *dir, unsigned int tam_dir)
         if (!meta_lido)
         {
             perror("Falha ao alocar memória para metadado lido");
-            return -1; // Allocation error
+            return -1; 
         }
 
-        // Read nome (TAM_MAX_FILENAME + 1 bytes)
+
         if (fread(meta_lido->nome, sizeof(char), TAM_MAX_FILENAME, arquivo) != (TAM_MAX_FILENAME))
         {
             perror("Erro ao ler nome do metadado");
             free(meta_lido);
             return -1;
         }
-        // Ensure null termination, though fwrite wrote TAM_MAX_FILENAME + 1 bytes,
-        // the last one should be the null char if snprintf worked correctly before writing.
-        // However, if the file was corrupted or written differently, this is a safeguard.
+
         meta_lido->nome[TAM_MAX_FILENAME] = '\0';
 
         if (fread(&meta_lido->uid, sizeof(uid_t), 1, arquivo) != 1)
@@ -364,10 +348,10 @@ int le_metadados_arquivo(FILE *arquivo, Lista *dir, unsigned int tam_dir)
             free(meta_lido);
             return -1;
         }
-        // u_acesso was removed from the struct, so no fread for it.
+      
 
-        insere_lista(dir, meta_lido); // Add the read metadata to the Lista
+        insere_lista(dir, meta_lido); 
     }
     printf("%d entradas de metadados lidas e adicionadas à lista.\n", tam_dir);
-    return 0; // Success
+    return 0;
 }

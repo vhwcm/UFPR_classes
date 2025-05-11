@@ -111,6 +111,7 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(opcao, "-m") == 0) 
         {
+            escreve = 1;
             if (mover(argv[2],argv[4],arquivo,diretorio) != 0){
                 fprintf(stderr, "Falha ao processar a opção -ic para %s e %s\n", argv[2], argv[4]);
                 return -1;
@@ -196,7 +197,7 @@ int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
         fclose(fp);
         return 1;
     }
-    unsigned int tam_original = (unsigned int)tamanho_arquivo;
+    int tam_original = (int)tamanho_arquivo;
     if (tam_original == 0)
     {
         printf("Arquivo de entrada %s está vazio. Nada a fazer.\n", nome_arquivo);
@@ -222,8 +223,8 @@ int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
     fclose(fp); // Fecha arquivo de entrada
 
     // Alocar buffer de saída para compressão (ligeiramente maior)
-    // Usar unsigned int para o tamanho do buffer para evitar problemas com trunc
-    unsigned int tam_buffer_saida = (unsigned int)(1.004 * tam_original + 1);
+    // Usar int para o tamanho do buffer para evitar problemas com trunc
+    int tam_buffer_saida = (int)(1.004 * tam_original + 1);
     char *buffer_saida = malloc(tam_buffer_saida);
     if (buffer_saida == NULL)
     {
@@ -239,15 +240,15 @@ int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
 
     // Determinar qual buffer e tamanho usar
     char *buffer_para_escrever = NULL;
-    unsigned int tamanho_para_escrever = 0;
-    unsigned int c_size_meta = 0; // Tamanho a ser armazenado nos metadados
+    int tamanho_para_escrever = 0;
+    int c_size_meta = 0; // Tamanho a ser armazenado nos metadados
 
     if (tam_comprimido > 0 && tam_comprimido < tam_original)
     {
         printf("Usando dados comprimidos.\n");
         buffer_para_escrever = buffer_saida;
-        tamanho_para_escrever = (unsigned int)tam_comprimido;
-        c_size_meta = (unsigned int)tam_comprimido;
+        tamanho_para_escrever = (int)tam_comprimido;
+        c_size_meta = (int)tam_comprimido;
     }
     else
     {
@@ -336,7 +337,7 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
         fclose(fp);
         return 1;
     }
-    unsigned int tam = (unsigned int)tamanho_arquivo;
+    int tam = (int)tamanho_arquivo;
     
     /* Alcoa o buffer*/
     char *buffer = malloc(tam);
@@ -359,7 +360,7 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
     fclose(fp);
 
     /* Escreve dados no arquivo.vc */
-    unsigned int local = ftell(arquivo);
+    int local = ftell(arquivo);
     if (fwrite(buffer, 1, tam, arquivo) != tam)
     {
         perror("Erro ao escrever dados no arquivo (-p)");
@@ -444,7 +445,7 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
 
     /* variavel auxiliar para acelerar os acessos */
     metadados *t_meta = target->data;
-    unsigned int t_tam = t_meta->c_size;
+    int t_tam = t_meta->c_size;
     char buffer[t_tam];
 
     /* Ponteiro do arquivo para o inicio dos dados do arquivo*/
@@ -467,7 +468,7 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
     }
 
     if(t_tam != t_meta->o_size){
-        unsigned int o_size = t_meta->o_size;
+        int o_size = t_meta->o_size;
         char buffer_out[o_size];
         LZ_Uncompress(buffer,buffer_out,t_tam);   
         if (fwrite(buffer_out,1,o_size,fp) != o_size)
@@ -489,9 +490,9 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
         printf("\nNao foi o possivel encontrar o arquivo: %s\n", nome_arquivo);
         return -1;
     }
+    int pos_membro = membro->data->pos;
 
-    unsigned int local_fim_t = 0;
-    unsigned int pos_target = 0;
+    int pos_target = 0;
     No* no_target;
     if(strcmp(target,"NULL") != 0){
         no_target = busca_lista(diretorio,target);
@@ -499,8 +500,6 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
             printf("\nNao foi o possivel encontrar o arquivo: %s\n", target);
             return -1;
         }
-
-        local_fim_t = no_target->data->local + no_target->data->c_size;
         pos_target = no_target->data->pos;
     }
 
@@ -508,13 +507,13 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
         printf("\nNada precisa ser feito...\n");
         return 0;
     }
-    unsigned int m_size = membro->data->c_size;
+    int m_size = membro->data->c_size;
     char m_buffer[m_size];
     fseek(arquivo,membro->data->local ,SEEK_SET);
     fread(m_buffer,1,m_size,arquivo);
 
-    unsigned int tam_dir = diretorio->tamanho;
-    unsigned int tam_max = 0;
+    int tam_dir = diretorio->tamanho;
+    int tam_max = 0;
     No* vetor[tam_dir];
     No* aux = diretorio->primeiro;
     /* O vetor e preenchido com os ponteiros da lista*/
@@ -528,13 +527,13 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
     }
 
     char aux_buffer[tam_max];
-    unsigned int pos_atual = membro->data->pos;
+    int pos_atual = membro->data->pos;
     aux = membro;
 
     /* Caso que deve ser deslocado para frente*/
     if(pos_target > membro->data->pos){
         /* Itera sobre todos os membros entre o membro e o target-inclusive */
-        for (unsigned int i = pos_atual; i < pos_target; i++){
+        for (int i = pos_atual; i < pos_target; i++){
             
             /*Le o dado do próximo arquivo*/
             aux = aux->prox;
@@ -543,7 +542,7 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
             fread(aux_buffer, 1, aux->data->c_size,arquivo);
             fseek(arquivo, aux->data->local,SEEK_SET);
             fseek(arquivo, -m_size,SEEK_CUR);
-            unsigned int n_local = ftell(arquivo);
+            int n_local = ftell(arquivo);
             aux->data->local = n_local;
             fwrite(aux_buffer,1,aux->data->c_size,arquivo);
         }
@@ -553,9 +552,11 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
         if(diretorio->primeiro == membro){
             diretorio->primeiro = membro->prox; 
         }
+
+        membro->data->pos = (aux->data->pos) + 1; 
     } else { /* Caso que deve ser deslocado para trás */
         /* Move o ponteiro para o fim do membro que será deslocado*/
-        for (unsigned int i = pos_atual; i > pos_target + 1; i--){
+        for (int i = pos_atual; i > pos_target + 1; i--){
             /* Lê o membro anterior*/
             aux = vetor[i - 1];
             aux->data->pos -= 1;
@@ -565,7 +566,7 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
             /* Faz o shift rigth no tamanho do membro*/
             fseek(arquivo, aux->data->local, SEEK_SET);
             fseek(arquivo, m_size, SEEK_CUR);
-            unsigned int n_local = ftell(arquivo);
+            int n_local = ftell(arquivo);
             aux->data->local = n_local;
             fwrite(aux_buffer,1,aux->data->c_size,arquivo);
         }
@@ -577,7 +578,7 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
             fread(aux_buffer, 1, aux->data->c_size,arquivo);
             fseek(arquivo, 0, SEEK_SET);
             fseek(arquivo, m_size, SEEK_CUR);
-            unsigned int n_local = ftell(arquivo);
+            int n_local = ftell(arquivo);
             aux->data->local = n_local;
             fwrite(aux_buffer,1,aux->data->c_size,arquivo);
             fseek(arquivo,0,SEEK_SET);
@@ -591,14 +592,16 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
             diretorio->ultimo = vetor[membro->data->pos-1];
         }
         /* Escreve o membro que se moveu*/
+
+        membro->data->pos = pos_target + 1; 
     }
-    unsigned int n_local = ftell(arquivo);
+    int n_local = ftell(arquivo);
     membro->data->local = n_local;
     fwrite(m_buffer, 1, m_size, arquivo);
 
     /* Corrige diretorio*/
     No* temp;
-    if(membro->data->pos != 0){
+    if(pos_membro){
         temp = vetor[membro->data->pos - 1];
         temp->prox = membro->prox;    
     }
@@ -609,7 +612,7 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
     }else{
         membro->prox = no_target->prox;
         no_target->prox = membro;
-        membro->data->pos = pos_target + 1;
     }
     return 0;
 }
+

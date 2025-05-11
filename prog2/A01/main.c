@@ -7,47 +7,67 @@
 #include <time.h>
 #include <math.h>
 #include "lz.h"
-#include "lista.h"
+#include "vina.h"
 
-int inserir_p(const char *nome_arquivo, FILE *arquivo, List *diretorio);
+int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
-int inserir_compressao(const char *nome_arquivo, FILE *arquivo, List *diretorio);
+int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
-int ler_diretorio_arquivo(FILE *arquivo, List *diretorio);
+int ler_diretorio_arquivo(FILE *arquivo, Lista *diretorio);
+
+int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
+
+int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
+
 
 int main(int argc, char *argv[])
 {
     printf("\ntamanho do TAM_METADADOS_NO_DISCO:%ld\n", TAM_METADADOS_NO_DISCO);
-    if (argc < 4)
+    if (argc < 4) /* Verifica se o número de argumentos está correto*/
     {
         printf("Formato Incorreto!\nUtilize: ./vina -[arg] [arquivo] [arquivo1...arquivoN]\n");
         return -1;
     }
+    /* Variável que será incrementada para iterar os argumentos*/
     int argumento_atual = 1;
     char *opcao = argv[argumento_atual];
     argumento_atual++;
     FILE *arquivo = NULL;
+    
+    /* Cria struct para ter as informações do arquivo e inicializa o Diretório */
+    struct stat info_arquivo;
+    Lista *diretorio = (Lista *)malloc(sizeof(Lista));
+    if (!diretorio)
+    return 2;
+    
+    int escreve = 1;
+    if(strcmp(opcao,"-m") == 0){
+        if (argc < 5) {
+            printf("Formato Incorreto!\nUtilize: ./vina -m [membro target] [arquivo] [arquivo1...arquivoN]\n");
+            return -1;
+        }
 
-    if (strcmp(opcao, "-ip") == 0 || strcmp(opcao, "-ic") == 0)
-    {
+        /* Trata opção -m */
+    
+    } else { /* Trata as outras opções */
+        /* Abre o arquivo existente ou cria um novo */
         arquivo = fopen(argv[argumento_atual], "rb+");
         if (!arquivo)
         {
-            arquivo = fopen("arquivo.vc", "wb+");
+            arquivo = fopen(argv[argumento_atual], "wb+");
             if (!arquivo)
             {
                 perror("Não foi possível abrir/criar arquivo.vc");
                 return 1;
             }
         }
-        struct stat info_arquivo;
-        char proxima_opcao;
-        List *diretorio = (List *)malloc(sizeof(List));
-        if (!diretorio)
-            return 2;
-
+        
+        
+        /* Lê o diretório do arquivo. Retorna 0 se diretório inexistente */
         int tam_diretorio = ler_diretorio_arquivo(arquivo, diretorio);
-
+        imprime_lista(diretorio);
+        
+        /* Caso haja diretório, posiciona o ponteiro para o depois do último arquivo */
         argumento_atual++;
         if (tam_diretorio)
         {
@@ -59,80 +79,80 @@ int main(int argc, char *argv[])
         {
             printf("\nDiretório vazio\n");
         }
-
-        while (argumento_atual < argc)
-        {
-            if (strcmp(opcao, "-ip") == 0)
+        
+        if (strcmp(opcao, "-ip") == 0)
+        {     
+            /* Loop para inserir os membros até o fim */
+            while (argumento_atual < argc)
             {
                 if (inserir_p(argv[argumento_atual], arquivo, diretorio) != 0)
-                    fprintf(stderr, "Falha ao processar a opção -p para %s\n", opcao);
-            }
-            else
-            {
-                if (inserir_compressao(argv[argumento_atual], arquivo, diretorio) != 0)
-                    fprintf(stderr, "Falha ao processar a opção -p para %s\n", opcao);
+                {
+                    fprintf(stderr, "Falha ao processar a opção -ip para %s\n", argv[argumento_atual]);
+                }
+                argumento_atual++;
             }
             imprime_lista(diretorio);
-            argumento_atual++;
-        }
+        } 
+        else if (strcmp(opcao, "-ic") == 0)
+        {     
+            /* Loop para inserir os membros até o fim */
+            while (argumento_atual < argc)
+            {
+                if (inserir_c(argv[argumento_atual], arquivo, diretorio) != 0)
+                {
+                    fprintf(stderr, "Falha ao processar a opção -ic para %s\n", argv[argumento_atual]);
+                }
+                argumento_atual++;
+            }
+            imprime_lista(diretorio);
+        } 
 
-        if (escreve_metadados_arquivo(arquivo, diretorio))
+        else if (strcmp(opcao, "-x") == 0) 
         {
-            fprintf(stderr, "Erro ao escrever metadados");
+            escreve = 0; /* Porque essa opção não mexe no diretório */
+           /* Loop para inserir os membros até o fim */
+           while (argumento_atual < argc)
+           {
+               if (extrair(argv[argumento_atual], arquivo, diretorio) != 0)
+               {
+                   fprintf(stderr, "Falha ao processar a opção -x para %s\n", argv[argumento_atual]);
+               }
+               argumento_atual++;
+           }
         }
-    }
-    else if (strcmp(opcao, "-m") == 0)
-    {
-        arquivo = fopen(argv[argumento_atual], "rb+");
-        if (!arquivo)
+        else if (strcmp(opcao, "-r") == 0)
         {
-            arquivo = fopen("arquivo.vc", "wb+");
+            arquivo = fopen(argv[argumento_atual], "rb+");
             if (!arquivo)
             {
-                perror("Não foi possível abrir/criar arquivo.vc");
-                return 1;
+                arquivo = fopen("arquivo.vc", "wb+");
+                if (!arquivo)
+                {
+                    perror("Não foi possível abrir/criar arquivo.vc");
+                    return 1;
+                }
             }
         }
-    }
-    else if (strcmp(opcao, "-x") == 0)
-    {
-        arquivo = fopen(argv[argumento_atual], "rb+");
-        if (!arquivo)
+        else
         {
-            arquivo = fopen("arquivo.vc", "wb+");
-            if (!arquivo)
-            {
-                perror("Não foi possível abrir/criar arquivo.vc");
-                return 1;
-            }
+            printf("Argumento incorreto!!\n");
+            return -2;
         }
-    }
-    else if (strcmp(opcao, "-r") == 0)
-    {
-        arquivo = fopen(argv[argumento_atual], "rb+");
-        if (!arquivo)
-        {
-            arquivo = fopen("arquivo.vc", "wb+");
-            if (!arquivo)
-            {
-                perror("Não foi possível abrir/criar arquivo.vc");
-                return 1;
-            }
-        }
-    }
-    else
-    {
-        printf("Argumento incorreto!!\n");
-        return -2;
     }
 
+    /* Depois de escrever todos os membros, escreve o diretório*/
+    if (escreve && escreve_metadados_arquivo(arquivo, diretorio))
+    {
+        fprintf(stderr, "Erro ao escrever metadados");
+    }
+    
     printf("Finalizando...\n");
-
+    
     fclose(arquivo);
     return 0;
 }
 
-int inserir_compressao(const char *nome_arquivo, FILE *arquivo, List *diretorio)
+int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
 {
     printf("-ic foi incluído, seu valor associado é: %s\n", nome_arquivo);
     FILE *fp = fopen(nome_arquivo, "rb");
@@ -224,8 +244,8 @@ int inserir_compressao(const char *nome_arquivo, FILE *arquivo, List *diretorio)
     }
 
     // Obter posição atual no arquivo de arquivamento ANTES de escrever
-    long data_start_pos = ftell(arquivo);
-    if (data_start_pos == -1)
+    long local = ftell(arquivo);
+    if (local == -1)
     {
         perror("Erro ao obter posição no arquivo de arquivamento (-ic)");
         free(buffer_entrada);
@@ -241,7 +261,7 @@ int inserir_compressao(const char *nome_arquivo, FILE *arquivo, List *diretorio)
         free(buffer_saida);
         return 1;
     }
-    printf("Dados escritos no arquivamento (%u bytes) na posição %ld.\n", tamanho_para_escrever, data_start_pos);
+    printf("Dados escritos no arquivamento (%u bytes) na posição %ld.\n", tamanho_para_escrever, local);
 
     // Criar e preencher metadados
     metadados *fmeta = criar_metadados(nome_arquivo); // Assumindo que criar_metadados pega info da struct stat
@@ -254,8 +274,9 @@ int inserir_compressao(const char *nome_arquivo, FILE *arquivo, List *diretorio)
         free(buffer_saida);
         return 1;
     }
-    fmeta->pos = (unsigned int)data_start_pos; // Posição onde os dados começam
-    fmeta->c_size = c_size_meta;               // Tamanho dos dados escritos no arquivo
+    fmeta->pos = diretorio->tamanho;
+    fmeta->local = local;
+    fmeta->c_size = c_size_meta;  
     // fmeta->o_size já deve ter sido preenchido por criar_metadados a partir de info_arquivo.st_size
 
     // Inserir metadados na lista em memória
@@ -268,9 +289,12 @@ int inserir_compressao(const char *nome_arquivo, FILE *arquivo, List *diretorio)
     return 0; // Sucesso
 }
 
-int inserir_p(const char *nome_arquivo, FILE *arquivo, List *diretorio)
+int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
 {
+
     printf("-ip foi incluído, seu valor associado é: %s\n", nome_arquivo);
+
+    /* Abre o arquivo selecionado*/
     FILE *fp = fopen(nome_arquivo, "rb");
     if (fp == NULL)
     {
@@ -278,6 +302,8 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, List *diretorio)
         fprintf(stderr, "Nome do arquivo: %s\n", nome_arquivo);
         return 1;
     }
+
+    /* Retira as informações do arquivo selecionado */
     int fd = fileno(fp);
     struct stat info_arquivo;
     if (fstat(fd, &info_arquivo) == -1)
@@ -287,45 +313,51 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, List *diretorio)
         return 1;
     }
 
+    /* Obtém o tamanho do arquivo*/
     fseek(fp, 0, SEEK_END);
     long tamanho_arquivo = ftell(fp);
     if (tamanho_arquivo < 0)
     {
-        perror("Erro ao obter tamanho do arquivo (-p)");
+        perror("Erro ao obter tamanho do arquivo (-ip)");
         fclose(fp);
         return 1;
     }
-
     unsigned int tam = (unsigned int)tamanho_arquivo;
+    
+    /* Alcoa o buffer*/
     char *buffer = malloc(tam);
     if (buffer == NULL)
     {
-        perror("Erro ao alocar buffer (-p)");
+        perror("Erro ao alocar buffer (-ip)");
         fclose(fp);
         return 1;
     }
 
+    /* Repocisiona para o inicio do arquivo e lê o conteúdo*/
     rewind(fp);
     if (fread(buffer, 1, tam, fp) != tam)
     {
-        perror("Erro ao ler arquivo (-p)");
+        perror("Erro ao ler arquivo (-ip)");
         free(buffer);
         fclose(fp);
         return 1;
     }
     fclose(fp);
 
+    /* Escreve dados no arquivo.vc */
+    unsigned int local = ftell(arquivo);
     if (fwrite(buffer, 1, tam, arquivo) != tam)
     {
         perror("Erro ao escrever dados no arquivo (-p)");
     }
 
-    unsigned int posicao = ftell(arquivo);
-    printf("\nPosição %d tam bytes, após escrever dados\n", posicao);
-
+    printf("\nPosição %ld tam bytes, após escrever dados\n", ftell(arquivo));
     printf("Dados de %s (tamanho %u) processados pela opção -p.\n", nome_arquivo, tam);
-
+    
     metadados *fmeta = criar_metadados(nome_arquivo);
+    fmeta->pos = diretorio->tamanho;
+    fmeta->local = local;
+
     if (!fmeta)
     {
         fprintf(stderr, "Falha ao criar metadados para %s\n", nome_arquivo);
@@ -334,14 +366,14 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, List *diretorio)
 
     insere_lista(diretorio, fmeta);
 
-    posicao = ftell(arquivo);
-    printf("\nFinalizado com %d tam bytes\n", posicao);
+    local = ftell(arquivo);
+    printf("\nFinalizado com %d tam bytes\n", local);
 
     free(buffer);
     return 0;
 }
 
-int ler_diretorio_arquivo(FILE *arquivo, List *diretorio)
+int ler_diretorio_arquivo(FILE *arquivo, Lista *diretorio)
 {
     fseek(arquivo, 0, SEEK_END);
     long tamanho_arquivo = ftell(arquivo);
@@ -383,7 +415,55 @@ int ler_diretorio_arquivo(FILE *arquivo, List *diretorio)
     else
     {
         inicializa_lista(diretorio);
-        printf("Arquivo de arquivamento vazio ou muito pequeno para conter um diretório.\n");
+        perror("Arquivo de arquivamento vazio ou muito pequeno para conter um diretório.\n");
         return 0;
     }
+}
+
+int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
+    /* Acha o nó da do arquivo no diretorio*/
+    No *target = busca_lista(diretorio,nome_arquivo);
+    if (target == NULL){
+        perror("arquivo não encontrado o target");
+        return -1;
+    }
+
+    /* variavel auxiliar para acelerar os acessos */
+    metadados *t_meta = target->data;
+    unsigned int t_tam = t_meta->c_size;
+    char buffer[t_tam];
+
+    /* Ponteiro do arquivo para o inicio dos dados do arquivo*/
+    if (fseek(arquivo, t_meta->local, SEEK_SET) != 0){
+        perror("arquivo não encontrado no diretorio");
+        return -2;
+    }
+
+    /* Le o conteúdo do arquivo */
+    if(fread(buffer,1,t_tam,arquivo) != t_tam){
+        return -3;
+        perror("\nNao foi possível ler o arquivo!\n");
+    }
+        
+    FILE *fp = fopen(nome_arquivo,"wb+");
+    
+    if(!fp){
+        perror("\nNao foi possível criar o arquivo!\n");
+        return -2;
+    }
+
+    if(t_tam != t_meta->o_size){
+        unsigned int o_size = t_meta->o_size;
+        char buffer_out[o_size];
+        LZ_Uncompress(buffer,buffer_out,t_tam);   
+        if (fwrite(buffer_out,1,o_size,fp) != o_size)
+            perror("\nNao foi possível escrever no arquivo!\n");
+    } else {
+        if (fwrite(buffer,1,t_tam,fp) != t_tam)
+            perror("\nNao foi possível escrever no arquivo!\n");
+        
+    }
+    
+    fclose(fp);
+    return 0;
 }

@@ -23,6 +23,8 @@ int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio);
 
 int listar_conteudo(FILE *arquivo, Lista *diretorio);
 
+int substituir_arquivo(const char *nome_arquivo, FILE *arquivo, Lista *diretorio, 
+                      char *buffer_novo, int tamanho_novo);
 
 int main(int argc, char *argv[])
 {
@@ -180,8 +182,11 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
-{
+int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
+    // 1. Verifica se o arquivo já existe
+    No* arquivo_existente = busca_lista(diretorio, nome_arquivo);
+    
+    // 2. Ler e preparar o arquivo para inserção
     printf("-ic foi incluído, seu valor associado é: %s\n", nome_arquivo);
     FILE *fp = fopen(nome_arquivo, "rb");
     if (fp == NULL)
@@ -271,55 +276,63 @@ int inserir_c(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
         c_size_meta = tam_original; // Armazena tamanho original se não comprimiu bem
     }
 
-    // Obter posição atual no arquivo de arquivamento ANTES de escrever
-    long local = ftell(arquivo);
-    if (local == -1)
-    {
-        perror("Erro ao obter posição no arquivo de arquivamento (-ic)");
+    // 3. Bifurcação baseada na existência do arquivo
+    if (arquivo_existente) {
+        printf("Arquivo %s já existe, será substituído.\n", nome_arquivo);
+        int resultado = substituir_arquivo(nome_arquivo, arquivo, diretorio, 
+                                          buffer_para_escrever, tamanho_para_escrever);
+        if (resultado == 0) {
+            // Atualização bem sucedida
+            arquivo_existente->data->o_size = tam_original;
+            arquivo_existente->data->c_size = c_size_meta;
+            arquivo_existente->data->u_mod = time(NULL); // Atualiza data
+        }
         free(buffer_entrada);
         free(buffer_saida);
-        return 1;
-    }
+        return resultado;
+    } else {
+        // 4. Inserção normal apenas se o arquivo não existir
+        long local = ftell(arquivo);
+        if (fwrite(buffer_para_escrever, 1, tamanho_para_escrever, arquivo) != tamanho_para_escrever) {
+            perror("Erro ao escrever dados no arquivo de arquivamento (-ic)");
+            free(buffer_entrada);
+            free(buffer_saida);
+            return 1;
+        }
+        printf("Dados escritos no arquivamento (%u bytes) na posição %ld.\n", tamanho_para_escrever, local);
 
-    // Escrever dados (comprimidos ou originais) no arquivo de arquivamento
-    if (fwrite(buffer_para_escrever, 1, tamanho_para_escrever, arquivo) != tamanho_para_escrever)
-    {
-        perror("Erro ao escrever dados no arquivo de arquivamento (-ic)");
+        // Criar e preencher metadados
+        metadados *fmeta = criar_metadados(nome_arquivo); // Assumindo que criar_metadados pega info da struct stat
+        if (!fmeta)
+        {
+            fprintf(stderr, "Falha ao criar metadados para %s\n", nome_arquivo);
+            // Os dados já foram escritos, o arquivo está parcialmente corrompido.
+            // Idealmente, deveria haver uma forma de reverter ou marcar como inválido.
+            free(buffer_entrada);
+            free(buffer_saida);
+            return 1;
+        }
+        fmeta->pos = diretorio->tamanho;
+        fmeta->local = local;
+        fmeta->o_size = tam_original;  
+        fmeta->c_size = c_size_meta;  
+
+        // Inserir metadados na lista em memória
+        insere_lista(diretorio, fmeta); // fmeta agora pertence à lista
+
+        // Liberar buffers
         free(buffer_entrada);
         free(buffer_saida);
-        return 1;
+
+        return 0; // Sucesso
     }
-    printf("Dados escritos no arquivamento (%u bytes) na posição %ld.\n", tamanho_para_escrever, local);
-
-    // Criar e preencher metadados
-    metadados *fmeta = criar_metadados(nome_arquivo); // Assumindo que criar_metadados pega info da struct stat
-    if (!fmeta)
-    {
-        fprintf(stderr, "Falha ao criar metadados para %s\n", nome_arquivo);
-        // Os dados já foram escritos, o arquivo está parcialmente corrompido.
-        // Idealmente, deveria haver uma forma de reverter ou marcar como inválido.
-        free(buffer_entrada);
-        free(buffer_saida);
-        return 1;
-    }
-    fmeta->pos = diretorio->tamanho;
-    fmeta->local = local;
-    fmeta->c_size = c_size_meta;  
-    // fmeta->o_size já deve ter sido preenchido por criar_metadados a partir de info_arquivo.st_size
-
-    // Inserir metadados na lista em memória
-    insere_lista(diretorio, fmeta); // fmeta agora pertence à lista
-
-    // Liberar buffers
-    free(buffer_entrada);
-    free(buffer_saida);
-
-    return 0; // Sucesso
 }
 
 int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
 {
-
+    // Verifica se o arquivo já existe no diretório
+    No* arquivo_existente = busca_lista(diretorio, nome_arquivo);
+    
     printf("-ip foi incluído, seu valor associado é: %s\n", nome_arquivo);
 
     /* Abre o arquivo selecionado*/
@@ -352,7 +365,7 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
     }
     int tam = (int)tamanho_arquivo;
     
-    /* Alcoa o buffer*/
+    /* Aloca o buffer*/
     char *buffer = malloc(tam);
     if (buffer == NULL)
     {
@@ -372,33 +385,53 @@ int inserir_p(const char *nome_arquivo, FILE *arquivo, Lista *diretorio)
     }
     fclose(fp);
 
-    /* Escreve dados no arquivo.vc */
-    int local = ftell(arquivo);
-    if (fwrite(buffer, 1, tam, arquivo) != tam)
-    {
-        perror("Erro ao escrever dados no arquivo (-p)");
+    if (arquivo_existente) {
+        printf("Arquivo %s já existe, será substituído.\n", nome_arquivo);
+        int resultado = substituir_arquivo(nome_arquivo, arquivo, diretorio, buffer, tam);
+        if (resultado == 0) {
+            // Atualização bem sucedida
+            arquivo_existente->data->o_size = tam; // Atualiza tamanho original
+            arquivo_existente->data->c_size = tam; // Também atualiza o tamanho comprimido
+            arquivo_existente->data->u_mod = time(NULL); // Atualiza data de modificação
+            free(buffer);
+            return 0;
+        } else {
+            // Houve erro na substituição
+            free(buffer);
+            return resultado;
+        }
+    } else {
+        /* Escreve dados no arquivo.vc */
+        int local = ftell(arquivo);
+        if (fwrite(buffer, 1, tam, arquivo) != tam)
+        {
+            perror("Erro ao escrever dados no arquivo (-p)");
+            free(buffer);
+            return 1;
+        }
+
+        printf("\nPosição %ld tam bytes, após escrever dados\n", ftell(arquivo));
+        printf("Dados de %s (tamanho %u) processados pela opção -p.\n", nome_arquivo, tam);
+        
+        metadados *fmeta = criar_metadados(nome_arquivo);
+        if (!fmeta)
+        {
+            fprintf(stderr, "Falha ao criar metadados para %s\n", nome_arquivo);
+            free(buffer);
+            return 1;
+        }
+        
+        fmeta->pos = diretorio->tamanho;
+        fmeta->local = local;
+        
+        insere_lista(diretorio, fmeta);
+
+        local = ftell(arquivo);
+        printf("\nFinalizado com %d tam bytes\n", local);
+
+        free(buffer);
+        return 0;
     }
-
-    printf("\nPosição %ld tam bytes, após escrever dados\n", ftell(arquivo));
-    printf("Dados de %s (tamanho %u) processados pela opção -p.\n", nome_arquivo, tam);
-    
-    metadados *fmeta = criar_metadados(nome_arquivo);
-    fmeta->pos = diretorio->tamanho;
-    fmeta->local = local;
-
-    if (!fmeta)
-    {
-        fprintf(stderr, "Falha ao criar metadados para %s\n", nome_arquivo);
-        return 1;
-    }
-
-    insere_lista(diretorio, fmeta);
-
-    local = ftell(arquivo);
-    printf("\nFinalizado com %d tam bytes\n", local);
-
-    free(buffer);
-    return 0;
 }
 
 int ler_diretorio_arquivo(FILE *arquivo, Lista *diretorio)
@@ -459,8 +492,14 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
     /* variavel auxiliar para acelerar os acessos */
     metadados *t_meta = target->data;
     int t_tam = t_meta->c_size;
-    char buffer[t_tam];
-
+    
+    /* Aloca buffer com tamanho apropriado */
+    char *buffer = malloc(t_tam);
+    if (!buffer) {
+        perror("Erro ao alocar memória para extração");
+        return -1;
+    }
+    
     /* Ponteiro do arquivo para o inicio dos dados do arquivo*/
     if (fseek(arquivo, t_meta->local, SEEK_SET) != 0){
         perror("arquivo não encontrado no diretorio");
@@ -469,8 +508,8 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
 
     /* Le o conteúdo do arquivo */
     if(fread(buffer,1,t_tam,arquivo) != t_tam){
-        return -3;
         perror("\nNao foi possível ler o arquivo!\n");
+        return -3;
     }
         
     FILE *fp = fopen(nome_arquivo,"wb+");
@@ -482,15 +521,24 @@ int extrair(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
 
     if(t_tam != t_meta->o_size){
         int o_size = t_meta->o_size;
-        char buffer_out[o_size];
-        LZ_Uncompress(buffer,buffer_out,t_tam);   
-        if (fwrite(buffer_out,1,o_size,fp) != o_size)
-            perror("\nNao foi possível escrever no arquivo!\n");
-    } else {
-        if (fwrite(buffer,1,t_tam,fp) != t_tam)
+        char *buffer_out = malloc(o_size);
+        if (!buffer_out) {
+            perror("Erro ao alocar memória para descompressão");
+            free(buffer);
+            return -1;
+        }
+        
+        LZ_Uncompress(buffer, buffer_out, t_tam);   
+        if (fwrite(buffer_out, 1, o_size, fp) != o_size)
             perror("\nNao foi possível escrever no arquivo!\n");
         
+        free(buffer_out);
+    } else {
+        if (fwrite(buffer, 1, t_tam, fp) != t_tam)
+            perror("\nNao foi possível escrever no arquivo!\n");
     }
+    
+    free(buffer);
     
     fclose(fp);
     return 0;
@@ -521,9 +569,18 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
         return 0;
     }
     int m_size = membro->data->c_size;
-    char m_buffer[m_size];
+    char *m_buffer = malloc(m_size);
+    if (!m_buffer) {
+        perror("Erro ao alocar memória para mover arquivo");
+        return -1;
+    }
+    
     fseek(arquivo,membro->data->local ,SEEK_SET);
-    fread(m_buffer,1,m_size,arquivo);
+    if (fread(m_buffer,1,m_size,arquivo) != m_size) {
+        perror("Erro ao ler arquivo para mover");
+        free(m_buffer);
+        return -1;
+    }
 
     int tam_dir = diretorio->tamanho;
     int tam_max = 0;
@@ -539,7 +596,13 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
         aux = aux->prox;
     }
 
-    char aux_buffer[tam_max];
+    char *aux_buffer = malloc(tam_max);
+    if (!aux_buffer) {
+        perror("Erro ao alocar buffer auxiliar");
+        free(m_buffer);
+        return -1;
+    }
+    
     int pos_atual = membro->data->pos;
     aux = membro;
 
@@ -552,7 +615,12 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
             aux = aux->prox;
             aux->data->pos -= 1;
             fseek(arquivo, aux->data->local,SEEK_SET);
-            fread(aux_buffer, 1, aux->data->c_size,arquivo);
+            if (fread(aux_buffer, 1, aux->data->c_size,arquivo) != aux->data->c_size) {
+                perror("Erro ao ler arquivo durante movimentação");
+                free(m_buffer);
+                free(aux_buffer);
+                return -1;
+            }
             fseek(arquivo, aux->data->local,SEEK_SET);
             fseek(arquivo, -m_size,SEEK_CUR);
             int n_local = ftell(arquivo);
@@ -626,6 +694,9 @@ int mover(const char *nome_arquivo,const char *target, FILE *arquivo, Lista *dir
         membro->prox = no_target->prox;
         no_target->prox = membro;
     }
+    
+    free(m_buffer);
+    free(aux_buffer);
     return 0;
 }
 
@@ -656,7 +727,11 @@ int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
         aux = aux->prox;
     }
     
-    char buffer[tam_max];
+    char *buffer = malloc(tam_max);
+    if (!buffer) {
+        perror("Erro ao alocar memória durante remoção");
+        return -1;
+    }
     
     // Deslocar todos os arquivos que vêm depois do removido para frente
     for (int i = pos_remover + 1; i < tam_dir; i++) {
@@ -714,6 +789,9 @@ int remover(const char *nome_arquivo, FILE *arquivo, Lista *diretorio) {
     // Atualiza o tamanho do diretório
     diretorio->tamanho--;
     
+    // Libera buffer alocado
+    free(buffer);
+    
     printf("Arquivo %s removido com sucesso.\n", nome_arquivo);
     return 0;
 }
@@ -731,28 +809,193 @@ int listar_conteudo(FILE *arquivo, Lista *diretorio) {
     for(int i = 0; i < tamanho; i++){
         local = aux->data->local;
         int tam = aux->data->c_size;
-        char buffer[tam];
+        char *buffer = malloc(tam);
+        if (!buffer) {
+            perror("Erro ao alocar memória para exibir conteúdo");
+            return -1;
+        }
         printf("=Metadados=\n");
         imprime_metadados(aux->data);
         fseek(arquivo,local,SEEK_SET);
-        fread(buffer,1,tam,arquivo);
+        if (fread(buffer,1,tam,arquivo) != tam) {
+            perror("Erro ao ler conteúdo do arquivo");
+            free(buffer);
+            return -1;
+        }
         if(tam != aux->data->o_size){
           o_size = aux->data->o_size; 
-          char buffer_out[o_size];
-          LZ_Uncompress(buffer,buffer_out,o_size); 
+          char *buffer_out = malloc(o_size);
+          if (!buffer_out) {
+              perror("Erro ao alocar memória para descompressão");
+              free(buffer);
+              return -1;
+          }
+          LZ_Uncompress(buffer, buffer_out, tam); // Note: deve usar tam, não o_size aqui
           printf("\n=Conteudo=\n");
           for(int i = 0; i < o_size; i++){
             printf("%c",buffer_out[i]);
           }
-        }else{
+          free(buffer_out);
+        } else {
             printf("\n=Conteudo=\n");
             for(int i = 0; i < tam; i++){
                 printf("%c",buffer[i]);
             }
         }
+        free(buffer);
         printf("\n\n");
         aux = aux->prox;
     }
+    return 0;
+}
+
+// Substitui um arquivo existente no archive
+int substituir_arquivo(const char *nome_arquivo, FILE *arquivo, Lista *diretorio, 
+                      char *buffer_novo, int tamanho_novo) {
+    // Busca o arquivo que será substituído
+    No* membro = busca_lista(diretorio, nome_arquivo);
+    if (!membro) {
+        fprintf(stderr, "Erro: Arquivo %s não encontrado para substituição.\n", nome_arquivo);
+        return -1;
+    }
+    
+    // Tamanho do arquivo atual e sua posição no arquivo
+    int tamanho_atual = membro->data->c_size;
+    int pos_membro = membro->data->pos;
+    long local_membro = membro->data->local;
+    int diferenca_tamanho = tamanho_novo - tamanho_atual;
+    
+    printf("Substituindo arquivo %s (tamanho antigo: %d, novo: %d, diferença: %d)\n", 
+           nome_arquivo, tamanho_atual, tamanho_novo, diferenca_tamanho);
+    
+    // Se os tamanhos são iguais, simplesmente substituímos os dados
+    if (diferenca_tamanho == 0) {
+        fseek(arquivo, local_membro, SEEK_SET);
+        if (fwrite(buffer_novo, 1, tamanho_novo, arquivo) != tamanho_novo) {
+            perror("Erro ao substituir arquivo (mesmo tamanho)");
+            return -1;
+        }
+        return 0; // Substituição concluída
+    }
+    
+    // Criar vetor auxiliar para acessar os nós por posição
+    int tam_dir = diretorio->tamanho;
+    if (tam_dir <= 0) {
+        fprintf(stderr, "Erro: Diretório vazio durante substituição.\n");
+        return -1;
+    }
+    
+    No** vetor = malloc(tam_dir * sizeof(No*));
+    if (!vetor) {
+        perror("Erro ao alocar memória para vetor auxiliar");
+        return -1;
+    }
+    
+    int tam_max = 0;
+    No* aux = diretorio->primeiro;
+    
+    while (aux != NULL) {
+        if (aux->data->pos >= tam_dir) {
+            fprintf(stderr, "Erro: Posição inválida em metadados: %d (max: %d)\n", 
+                    aux->data->pos, tam_dir-1);
+            free(vetor);
+            return -1;
+        }
+        vetor[aux->data->pos] = aux;
+        if (aux->data->c_size > tam_max)
+            tam_max = aux->data->c_size;
+        aux = aux->prox;
+    }
+    
+    // Buffer para mover arquivos (usa o maior tamanho disponível)
+    // Evita buffer de tamanho zero
+    if (tam_max == 0) tam_max = 1;
+    
+    char *buffer_aux = malloc(tam_max);
+    if (!buffer_aux) {
+        perror("Erro ao alocar memória para substituição");
+        free(vetor);
+        return -1;
+    }
+    
+    if (diferenca_tamanho > 0) {
+        // Caso 1: Novo arquivo é maior - precisamos abrir espaço
+        // Deslocamos todos os arquivos à direita do atual
+        for (int i = tam_dir - 1; i > pos_membro; i--) {
+            aux = vetor[i];
+            
+            // Lê o arquivo
+            fseek(arquivo, aux->data->local, SEEK_SET);
+            if (fread(buffer_aux, 1, aux->data->c_size, arquivo) != aux->data->c_size) {
+                perror("Erro ao ler arquivo durante substituição");
+                free(buffer_aux);
+                free(vetor);
+                return -1;
+            }
+            
+            // Calcula nova localização
+            long nova_local = aux->data->local + diferenca_tamanho;
+            
+            // Escreve na nova posição
+            fseek(arquivo, nova_local, SEEK_SET);
+            if (fwrite(buffer_aux, 1, aux->data->c_size, arquivo) != aux->data->c_size) {
+                perror("Erro ao escrever arquivo durante substituição");
+                free(buffer_aux);
+                free(vetor);
+                return -1;
+            }
+            
+            // Só atualiza o metadado após confirmar a escrita bem-sucedida
+            aux->data->local = nova_local;
+        }
+    } else {
+        // Caso 2: Novo arquivo é menor - fechamos o espaço
+        // Deslocamos todos os arquivos à direita para a esquerda
+        for (int i = pos_membro + 1; i < tam_dir; i++) {
+            aux = vetor[i];
+            
+            // Lê o arquivo
+            fseek(arquivo, aux->data->local, SEEK_SET);
+            if (fread(buffer_aux, 1, aux->data->c_size, arquivo) != aux->data->c_size) {
+                perror("Erro ao ler arquivo durante substituição");
+                free(buffer_aux);
+                free(vetor);
+                return -1;
+            }
+            
+            // Calcula nova localização (diferenca_tamanho é negativo)
+            long nova_local = aux->data->local + diferenca_tamanho;
+            
+            // Escreve na nova posição
+            fseek(arquivo, nova_local, SEEK_SET);
+            if (fwrite(buffer_aux, 1, aux->data->c_size, arquivo) != aux->data->c_size) {
+                perror("Erro ao escrever arquivo durante substituição");
+                free(buffer_aux);
+                free(vetor);
+                return -1;
+            }
+            
+            // Só atualiza o metadado após confirmar a escrita bem-sucedida
+            aux->data->local = nova_local;
+        }
+    }
+    
+    // Escreve o novo conteúdo do arquivo substituído
+    fseek(arquivo, local_membro, SEEK_SET);
+    if (fwrite(buffer_novo, 1, tamanho_novo, arquivo) != tamanho_novo) {
+        perror("Erro ao escrever o novo conteúdo");
+        free(buffer_aux);
+        free(vetor);
+        return -1;
+    }
+    
+    // Atualiza os metadados do arquivo substituído
+    membro->data->c_size = tamanho_novo;
+    membro->data->u_mod = time(NULL); // Atualiza data de modificação
+    // o_size será atualizado na função chamadora (inserir_p ou inserir_c)
+    
+    free(buffer_aux);
+    free(vetor);
     return 0;
 }
 

@@ -1,26 +1,31 @@
 #ifndef HASH-TABLE
 #define HASH-TABLE
 
+#define M 11
+
 struct No_t {
   int chave;
-  bool deleted;  
-}
+};
 
 struct Ht{
-  No *t1[11];
-  No *t2[11];
-}
+  struct No_t *t1[M];
+  bool t1_deleted[M];
+  struct No_t *t2[M];
+  bool t2_deleted[M];
+};
 
 int h1(int chave);
 
 int h2(int chave);
 
-int buscaNo(int chave,struct *Ht hash_table,int *witch_table);
+int buscarNo(int chave,struct Ht* hash_table,int *witch_table);
 
-void insere(int chave,struct *Ht hash_table);
+int inserir(int chave,struct Ht* hash_table);
 
-void deletar(int cahve, struct *Ht hash_table);
+int deletar(int cahve, struct Ht* hash_table);
 
-void imprime(struct *Ht hash_table);
+void imprime(struct Ht* hash_table);
+
+void libera_hash_table(struct Ht* hash_table);
 
 #endif

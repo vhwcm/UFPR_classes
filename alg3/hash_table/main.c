@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     if(argc == 2){
       if(argv[1][0] == '-' && argv[1][1] == 'h'){
         printf("Nome: Victor Hugo Weigmann Chequer Maia\n");
-        printf("GRR: GRR5275\n");
+        printf("GRR: GRR20245275\n");
         printf("Login: vhwcm24\n");
         return 0;
       }else{

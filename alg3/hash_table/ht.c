@@ -5,6 +5,23 @@
 #include <stdbool.h>
 #include <stdlib.h>  
 
+struct Ht* criaHt(void) {
+    struct Ht* ht = (struct Ht*)malloc(sizeof(struct Ht));
+    if (ht == NULL) {
+        fprintf(stderr, "Falha na alocação de memória para Hash-Table em criaHt.\n");
+        return NULL;
+    }
+
+    for (int i = 0; i < M; i++) {
+        ht->t1[i] = NULL;
+        ht->t1_deleted[i] = false;
+        ht->t2[i] = NULL;
+        ht->t2_deleted[i] = false;
+    }
+
+    return ht;
+}
+
 // Estruturas para a lista de impressão e ordenação
 struct No_Imprime {
     int chave;
@@ -54,7 +71,7 @@ int buscaChave(int chave, struct Ht* hash_table, bool *witch_table_ptr){
   }
 }  
 
-int insere(int chave, struct Ht* hash_table){ 
+int inserir(int chave, struct Ht* hash_table){ 
   if(!hash_table)
     return -1; 
  
@@ -263,24 +280,6 @@ void libera_hash_table(struct Ht* hash_table) {
             free(hash_table->t2[i]);
             hash_table->t2[i] = NULL; // Boa prática
         }
-    }
-
-    // Libera os arrays das tabelas
-    if (hash_table->t1 != NULL) {
-        free(hash_table->t1);
-        hash_table->t1 = NULL;
-    }
-    if (hash_table->t1_deleted != NULL) {
-        free(hash_table->t1_deleted);
-        hash_table->t1_deleted = NULL;
-    }
-    if (hash_table->t2 != NULL) {
-        free(hash_table->t2);
-        hash_table->t2 = NULL;
-    }
-    if (hash_table->t2_deleted != NULL) {
-        free(hash_table->t2_deleted);
-        hash_table->t2_deleted = NULL;
     }
 
     // Libera a estrutura da hash table em si

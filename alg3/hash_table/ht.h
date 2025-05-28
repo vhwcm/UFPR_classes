@@ -1,5 +1,7 @@
-#ifndef HASH-TABLE
-#define HASH-TABLE
+#ifndef HASH_TABLE_H
+#define HASH_TABLE_H
+
+#include<stdbool.h>
 
 #define M 11
 
@@ -14,18 +16,23 @@ struct Ht{
   bool t2_deleted[M];
 };
 
+struct Ht* criaHt(void);
+
 int h1(int chave);
 
 int h2(int chave);
 
-int buscarNo(int chave,struct Ht* hash_table,int *witch_table);
+int buscarChave(int chave,struct Ht* hash_table,bool *witch_table);
 
 int inserir(int chave,struct Ht* hash_table);
 
-int deletar(int cahve, struct Ht* hash_table);
+int deletar(int chave, struct Ht* hash_table);
 
-void imprime(struct Ht* hash_table);
+int imprime(struct Ht* hash_table);
 
 void libera_hash_table(struct Ht* hash_table);
+
+
+
 
 #endif
